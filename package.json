@@ -1,0 +1,17 @@
+{
+  "name": "e14-suite",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "engines": {
+    "bun": ">=1.1.0"
+  },
+  "scripts": {
+    "dev:movil": "cd apps/digielect14 && bun run dev",
+    "dev:panel": "cd apps/supervision-e14 && bun run dev",
+    "verificar:movil": "cd apps/digielect14 && bun run verificar",
+    "verificar:panel": "cd apps/supervision-e14 && bun run verificar",
+    "test:motor": "bun test packages/scanner-core",
+    "build:panel": "cd apps/supervision-e14 && bun run build"
+  }
+}

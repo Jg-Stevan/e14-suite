@@ -1,0 +1,26 @@
+# dependencias
+node_modules/
+
+# builds / caches
+.next/
+.open-next/
+out/
+dist/
+coverage/
+.turbo/
+.wrangler/
+*.tsbuildinfo
+
+# entorno — NUNCA commitear valores reales (R4)
+.env
+.env.*
+!.env.example
+
+# modelos grandes se descargan por assets.lock.json (URL + SHA-256), no se versionan
+public/modelos/
+*.onnx
+
+# logs y sistema
+*.log
+.DS_Store
+Thumbs.db
