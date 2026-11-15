@@ -51,7 +51,9 @@ describe("acelerador — tarjeta del sidecar", () => {
   });
 
   test("el workflow sube exactamente ese asset a la release", () => {
-    const yml = leer(".github/workflows/sidecar-release.yml");
+    // El workflow vive en la raíz del monorepo: Actions solo ejecuta los que
+    // están en .github/workflows de la raíz, no los de una app.
+    const yml = leer("../../.github/workflows/sidecar-release.yml");
     expect(yml).toContain(`dist/${ARCHIVO}`);
     // `gh release upload/create` con el path: el nombre del asset es el basename.
     expect(yml).toMatch(/gh release (create|upload) "\$TAG" "\$ZIP"/);
