@@ -5,11 +5,12 @@
  * `renderToStaticMarkup` solo pintaría el primer frame. Se prueba lo que SÍ es
  * comprobable y lo que realmente puede romperse en silencio:
  *
- *  1) EL NOMBRE DEL ASSET, a tres bandas: la URL de la tarjeta, el archivo que
- *     sube el workflow y el `--name` de PyInstaller. Si uno de los tres se
- *     mueve, el botón queda en un 404 de GitHub — y un link roto no lanza nada,
- *     no se loguea, no se ve. Es el único fallo de esta tarjeta que no deja
- *     rastro.
+ *  1) EL NOMBRE DEL ASSET, a tres bandas: `ARCHIVO_SIDECAR` en la tarjeta, el
+ *     archivo que sube el workflow y el `--name` de PyInstaller. Si uno de los
+ *     tres se mueve, la descarga queda en un 404 — y un link roto no lanza
+ *     nada, no se loguea, no se ve. Es el único fallo de esta tarjeta que no
+ *     deja rastro. La página de descarga también forma parte del contrato: el
+ *     deploy parte el ZIP y ella lo reensambla byte a byte.
  *  2) El botón REINTENTAR corta la memoria del sondeo. Sin
  *     `invalidarSondaNativo()` el click releería un `ok:false` de hasta 15 s y
  *     la tarjeta diría «ausente» delante de un sidecar ya vivo.
@@ -21,23 +22,22 @@
  *     nunca imprimió.
  */
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { URL_DESCARGA_SIDECAR } from "../acelerador";
+import { ARCHIVO_SIDECAR, URL_DESCARGA_SIDECAR } from "../acelerador";
 
 const RAIZ = join(import.meta.dir, "../../../../../../../../");
 const leer = (rel: string) => readFileSync(join(RAIZ, rel), "utf8");
 
-/** El nombre de archivo que la app espera descargar. */
-const ARCHIVO = new URL(URL_DESCARGA_SIDECAR).pathname.split("/").pop()!;
-
 describe("acelerador — tarjeta del sidecar", () => {
-  test("la URL es la de la release `latest` (sin versión fija)", () => {
-    // `/releases/latest/download/` es lo único que sobrevive a una nueva
-    // release sin recompilar la app.
-    expect(URL_DESCARGA_SIDECAR).toContain("/releases/latest/download/");
-    expect(ARCHIVO).toBe("supervision-e14-sidecar-win-x64.zip");
+  test("la URL es la página de descarga del panel (sin repo público)", () => {
+    // El ZIP no cabe como asset de Pages (>25 MiB) ni en una release privada
+    // (el visitante no tiene login), así que la tarjeta manda a la página que
+    // arma el ZIP desde sus partes.
+    expect(URL_DESCARGA_SIDECAR).toBe("https://supervision-e14.pages.dev/descargas/sidecar/");
+    expect(ARCHIVO_SIDECAR).toBe("supervision-e14-sidecar-win-x64.zip");
   });
 
   test("el empaquetador produce exactamente ese ZIP (--nombre + sufijo)", () => {
@@ -45,16 +45,16 @@ describe("acelerador — tarjeta del sidecar", () => {
     const m = /argv\.nombre\s*\?\?\s*"([^"]+)"/.exec(fuente);
     expect(m).not.toBeNull();
     // El literal del ZIP tiene que ser `${NOMBRE}-win-x64.zip`; si alguien le
-    // cambia el sufijo o la extensión, el link de la tarjeta queda en 404.
+    // cambia el sufijo o la extensión, la descarga queda en 404.
     expect(fuente).toContain("${NOMBRE}-win-x64.zip");
-    expect(`${m![1]}-win-x64.zip`).toBe(ARCHIVO);
+    expect(`${m![1]}-win-x64.zip`).toBe(ARCHIVO_SIDECAR);
   });
 
   test("el workflow sube exactamente ese asset a la release", () => {
     // El workflow vive en la raíz del monorepo: Actions solo ejecuta los que
     // están en .github/workflows de la raíz, no los de una app.
     const yml = leer("../../.github/workflows/sidecar-release.yml");
-    expect(yml).toContain(`dist/${ARCHIVO}`);
+    expect(yml).toContain(`dist/${ARCHIVO_SIDECAR}`);
     // `gh release upload/create` con el path: el nombre del asset es el basename.
     expect(yml).toMatch(/gh release (create|upload) "\$TAG" "\$ZIP"/);
   });
@@ -151,12 +151,57 @@ describe("acelerador — tarjeta del sidecar", () => {
     expect(fuente).toMatch(/role="status"/);
   });
 
-  test("el href apunta al release real del sidecar (no a un placeholder)", () => {
-    // En el monorepo el .git vive en la raíz y el sidecar sigue publicándose
-    // desde supervision-e14: la URL se fija como contrato explícito.
-    expect(URL_DESCARGA_SIDECAR).toBe(
-      "https://github.com/Jg-Stevan/supervision-e14/releases/latest/download/supervision-e14-sidecar-win-x64.zip",
-    );
+  test("el href apunta a la página de descarga real (no a un placeholder)", () => {
+    expect(URL_DESCARGA_SIDECAR).toBe("https://supervision-e14.pages.dev/descargas/sidecar/");
+    expect(existsSync(join(RAIZ, "public/descargas/sidecar/index.html"))).toBe(true);
+    const html = leer("public/descargas/sidecar/index.html");
+    expect(html).toContain("manifiesto.json");
+    expect(html).toContain("Blob");
+  });
+
+  test("el deploy parte el ZIP y la página lo reensambla byte a byte", async () => {
+    const yml = leer("../../.github/workflows/deploy-panel.yml");
+    expect(yml).toContain("gh release download");
+    expect(yml).toContain("partir-descarga-sidecar.mjs");
+
+    const dir = mkdtempSync(join(tmpdir(), "e14-descarga-"));
+    try {
+      const original = Buffer.alloc(5 * 1024 + 7);
+      for (let i = 0; i < original.length; i += 1) original[i] = (i * 31) % 251;
+      const zip = join(dir, ARCHIVO_SIDECAR);
+      writeFileSync(zip, original);
+      const salida = join(dir, "salida");
+      mkdirSync(salida, { recursive: true });
+      // La página que copió Next vive en la misma carpeta: el partidor no
+      // puede borrarla al limpiar las partes del build anterior.
+      writeFileSync(join(salida, "index.html"), "<!doctype html><title>página</title>");
+      const p = Bun.spawn(
+        [
+          "node",
+          join(RAIZ, "scripts", "partir-descarga-sidecar.mjs"),
+          zip,
+          salida,
+          "--parte-bytes=1024",
+        ],
+        { cwd: RAIZ },
+      );
+      await p.exited;
+      expect(p.exitCode).toBe(0);
+      const m = JSON.parse(readFileSync(join(salida, "manifiesto.json"), "utf8")) as {
+        archivo: string;
+        bytes: number;
+        sha256: string;
+        partes: string[];
+      };
+      expect(m.archivo).toBe(ARCHIVO_SIDECAR);
+      expect(m.bytes).toBe(original.length);
+      expect(m.partes.length).toBe(Math.ceil(original.length / 1024));
+      const armado = Buffer.concat(m.partes.map((n) => readFileSync(join(salida, n))));
+      expect(armado.equals(original)).toBe(true);
+      expect(existsSync(join(salida, "index.html"))).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test("el «qué debes ver» de los docs es lo que realmente imprime servidor.py", () => {

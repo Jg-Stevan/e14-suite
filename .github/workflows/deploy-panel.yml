@@ -43,6 +43,28 @@ jobs:
         working-directory: apps/supervision-e14
         run: bun scripts/cf-wasm-partes.mjs
 
+      # Pages no deja subir un archivo > 25 MiB y el ZIP del sidecar pesa ~108.
+      # Se parte en el deploy y /descargas/sidecar/ lo reensambla en el navegador.
+      # Sin release sidecar-v* el deploy sigue: la página avisa que no está
+      # publicada. El asset conserva el nombre que fija la tarjeta.
+      - name: preparar la descarga del sidecar (partes < 25 MiB)
+        working-directory: apps/supervision-e14
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="$(gh release list --exclude-drafts --exclude-pre-releases --limit 50 \
+            --json tagName --jq '.[] | .tagName' | grep '^sidecar-v' | head -n1 || true)"
+          if [ -z "$tag" ]; then
+            echo "Sin release sidecar-v*: la página avisará que la descarga no está publicada."
+            exit 0
+          fi
+          tmp="$(mktemp -d)"
+          gh release download "$tag" -R "$GITHUB_REPOSITORY" \
+            --pattern 'supervision-e14-sidecar-win-x64.zip' --dir "$tmp"
+          node scripts/partir-descarga-sidecar.mjs \
+            "$tmp/supervision-e14-sidecar-win-x64.zip" out/descargas/sidecar
+
       - name: deploy (Cloudflare Pages)
         working-directory: apps/supervision-e14
         env:

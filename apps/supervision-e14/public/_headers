@@ -73,3 +73,9 @@
 # existen. 0 s + revalidación lo ata siempre al último build.
 /e14/*
   Cache-Control: public, max-age=0, must-revalidate
+
+# La descarga del sidecar arma el ZIP desde partes: el manifiesto también es
+# DATO del deploy. Las partes llevan el SHA-256 del ZIP en el nombre, así que
+# revalidarlas es barato (304) y nunca se mezclan builds.
+/descargas/sidecar/*
+  Cache-Control: public, max-age=0, must-revalidate

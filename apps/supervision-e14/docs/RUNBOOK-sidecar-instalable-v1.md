@@ -85,9 +85,13 @@ en la carpeta donde descomprimiste). Borra la carpeta y listo.
 
 ## B. Publicar un release nuevo (el mantenedor)
 
-El ZIP se construye **en Windows** (PyInstaller no cross-compila) y se publica desde
-el workflow. La URL que lee la tarjeta es `releases/latest/download/…`, así que la
-release nueva reemplaza a la anterior sin tocar el código de la app.
+El ZIP se construye **en Windows** (PyInstaller no cross-compila) y el workflow lo
+publica como asset de una release `sidecar-v<versión>` en este repo privado. La
+tarjeta NO baja de GitHub: el deploy del panel toma la última release
+`sidecar-v*` no-prerelease, parte el ZIP en trozos de < 25 MiB y los sirve en
+`https://supervision-e14.pages.dev/descargas/sidecar/`; la página los reensambla
+en el navegador. La release nueva reemplaza a la anterior en el siguiente deploy,
+sin tocar el código de la app.
 
 ### B.1 Localmente, antes de publicar
 
@@ -118,7 +122,7 @@ responda `/salud` ya demuestra que los modelos del bundle aterrizaron (la rama
 1. Commit y push a `main` de lo que cambie de `native/` o del script.
 2. Actions → **Release sidecar nativo** → *Run workflow* → `version` (semver, sin
    `v` — p. ej. `1.0.1`). Marca `prerelease` solo si NO quieres que la tarjeta lo
-   sirva todavía: `/releases/latest/` ignora prereleases.
+   sirva todavía: el deploy del panel filtra las releases prerelease.
 3. El job tarda ~6-9 min (pip + análisis de PyInstaller + arranque + `Compress-Archive`).
 
 Qué debes ver: una release `sidecar-v<versión>` con el asset
@@ -126,13 +130,17 @@ Qué debes ver: una release `sidecar-v<versión>` con el asset
 
 ### B.3 Verificar el release
 
+La release privada se verifica con `gh release view sidecar-v<versión> --json assets`;
+el asset debe estar `uploaded` y pesar ~110 MB. La descarga pública se verifica
+contra el manifiesto que deja el deploy:
+
 ```bash
-curl -sIL https://github.com/Jg-Stevan/supervision-e14/releases/latest/download/supervision-e14-sidecar-win-x64.zip \
-  | grep -E "^HTTP|content-length"
+curl -sS https://supervision-e14.pages.dev/descargas/sidecar/manifiesto.json \
+  | jq '{archivo, bytes, sha256, partes:(.partes|length)}'
 ```
 
-Debe resolver (tras los redirects de `latest`) con `HTTP 200` y un
-`content-length` de ~113,6 MB — unos KB arriba o abajo respecto al build local es
+Debe devolver el nombre `supervision-e14-sidecar-win-x64.zip`, el tamaño del
+asset y entre 5 y 6 partes. Unos KB arriba o abajo respecto al build local es
 normal (la versión de Python del runner cambia qué .dll entran).
 Descárgalo en una máquina limpia y corre la sección A. **Esa es la única prueba que
 vale**: el runner de GitHub no tiene tu antivirus ni tu SmartScreen.
@@ -157,7 +165,7 @@ Lo mismo con el puerto: `native/servidor.py --puerto` (8765) y la flag compilada
 | `gh: HTTP 404` al crear la release | `permissions: contents: write` ausente o el token sin alcance | el workflow ya lo declara; si lo editaste, revísalo |
 | El job muere en `Compress-Archive` | `dist\supervision-e14-sidecar` no existe (el build falló antes) | mira el log del paso anterior; casi siempre es `--add-data` |
 | `/salud` no contesta en el runner | otro proceso en 8799 o el exe abortó | el script imprime las últimas 2000 chars del stdout del exe al fallar |
-| La tarjeta del sitio sigue apuntando al ZIP viejo | cache del navegador o la release quedó marcada prerelease | `curl -sI …/releases/latest/download/…` para ver qué sirve `latest` |
+| La página `/descargas/sidecar/` dice «todavía no está publicada» | el deploy no encontró una release `sidecar-v*` no-prerelease, o el asset cambió de nombre | publica la release y vuelve a correr el deploy del panel; mira `…/descargas/sidecar/manifiesto.json` |
 | Arranque > 60 s y el job rojo | otra cosa: no el antivirus | el script vuelca la salida del exe; revisa si `e14nativo` está buscando `public/` (rama `_MEIPASS` tocada) |
 
 ### B.6 Prueba de origen (C-22 — plan 2026-11-11)

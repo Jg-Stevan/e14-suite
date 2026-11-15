@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Descargar el acelerador nativo · Supervisión E-14</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --fondo: #04100f;
+        --panel: #061214;
+        --borde: #112b2a;
+        --texto: #d1d5db;
+        --tenue: #6b7280;
+        --verde: #00e599;
+        --rojo: #fca5a5;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: var(--fondo);
+        color: var(--texto);
+        font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      main {
+        width: min(620px, 100%);
+        border: 1px solid var(--borde);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 24px;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 16px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--verde);
+      }
+      .sub { margin: 0 0 18px; color: var(--tenue); font-size: 12px; }
+      #estado { min-height: 3em; margin: 0 0 12px; }
+      #estado.error { color: var(--rojo); }
+      progress {
+        width: 100%;
+        height: 10px;
+        margin: 0 0 14px;
+        accent-color: var(--verde);
+      }
+      button {
+        width: 100%;
+        min-height: 44px;
+        cursor: pointer;
+        border: 1px solid rgba(0, 229, 153, 0.4);
+        border-radius: 6px;
+        background: #061e19;
+        color: var(--verde);
+        font: inherit;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      button:hover:not(:disabled) { background: #0c2f29; }
+      button:disabled { cursor: progress; opacity: 0.6; }
+      .nota { margin: 16px 0 0; color: var(--tenue); font-size: 11px; }
+      .nota code, .sha code { color: var(--texto); }
+      .sha {
+        margin: 0 0 14px;
+        padding: 10px;
+        border: 1px solid var(--borde);
+        border-radius: 6px;
+        color: var(--tenue);
+        font-size: 10px;
+        overflow-wrap: anywhere;
+      }
+      a { color: var(--verde); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Acelerador nativo</h1>
+      <p class="sub">
+        ZIP de Windows con el motor OCR y los modelos. No necesita Python, ni git,
+        ni instalador. El panel funciona igual sin esto: el sidecar solo acelera.
+      </p>
+
+      <p id="estado" role="status" aria-live="polite">Leyendo la descarga…</p>
+      <progress id="barra" max="100" value="0" hidden></progress>
+      <p id="sha" class="sha" hidden>SHA-256: <code id="sha-valor"></code></p>
+      <button id="descargar" type="button" hidden>Descargar ZIP</button>
+
+      <p class="nota">
+        Descomprime la carpeta y ejecuta
+        <code>supervision-e14-sidecar.exe</code>. Deja la ventana abierta: tarda
+        5-15 s en decir LISTO. SmartScreen lo frena la primera vez (binario sin
+        firmar): «Más información → Ejecutar de todas formas».
+      </p>
+      <p class="nota"><a href="https://supervision-e14.pages.dev/">Volver al panel</a></p>
+    </main>
+
+    <noscript>Activa JavaScript para armar el ZIP desde sus partes.</noscript>
+
+    <script>
+      (() => {
+        const estado = document.getElementById("estado");
+        const barra = document.getElementById("barra");
+        const sha = document.getElementById("sha");
+        const shaValor = document.getElementById("sha-valor");
+        const boton = document.getElementById("descargar");
+        let manifiesto = null;
+
+        const mib = (n) => (n / 1048576).toLocaleString("es", { maximumFractionDigits: 1 });
+
+        function decir(texto, esError = false) {
+          estado.textContent = texto;
+          estado.classList.toggle("error", esError);
+        }
+
+        async function cargar() {
+          try {
+            const r = await fetch("manifiesto.json", { cache: "no-store" });
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            manifiesto = await r.json();
+            if (!Array.isArray(manifiesto.partes) || manifiesto.partes.length === 0) {
+              throw new Error("manifiesto sin partes");
+            }
+            shaValor.textContent = manifiesto.sha256;
+            sha.hidden = false;
+            decir(
+              manifiesto.archivo + " · " + mib(manifiesto.bytes) + " MiB · " +
+                manifiesto.partes.length + " partes",
+            );
+            boton.hidden = false;
+          } catch (error) {
+            decir(
+              "La descarga del sidecar todavía no está publicada. El panel sigue " +
+                "funcionando por WASM, más lento.",
+              true,
+            );
+            console.error(error);
+          }
+        }
+
+        async function descargar() {
+          if (!manifiesto) return;
+          boton.disabled = true;
+          barra.hidden = false;
+          barra.max = manifiesto.bytes;
+          barra.value = 0;
+          const trozos = [];
+          let bajados = 0;
+          try {
+            for (let i = 0; i < manifiesto.partes.length; i += 1) {
+              decir(
+                "Bajando parte " + (i + 1) + "/" + manifiesto.partes.length + " · " +
+                  mib(bajados) + " de " + mib(manifiesto.bytes) + " MiB",
+              );
+              const r = await fetch(manifiesto.partes[i], { cache: "default" });
+              if (!r.ok) throw new Error("parte " + (i + 1) + ": HTTP " + r.status);
+              const trozo = await r.arrayBuffer();
+              trozos.push(trozo);
+              bajados += trozo.byteLength;
+              barra.value = bajados;
+            }
+            if (bajados !== manifiesto.bytes) {
+              throw new Error("tamaño " + bajados + " ≠ " + manifiesto.bytes);
+            }
+            const blob = new Blob(trozos, { type: "application/zip" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = manifiesto.archivo;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 120000);
+            decir(
+              "ZIP listo (" + mib(bajados) + " MiB). Descomprime la carpeta y ejecuta " +
+                "supervision-e14-sidecar.exe.",
+            );
+          } catch (error) {
+            decir("No se pudo bajar completo: " + error.message + ". Vuelve a intentarlo.", true);
+            console.error(error);
+          } finally {
+            boton.disabled = false;
+          }
+        }
+
+        boton.addEventListener("click", descargar);
+        cargar();
+      })();
+    </script>
+  </body>
+</html>

@@ -2,20 +2,23 @@ name: Release sidecar nativo
 
 # KIT e14-sidecar-instalable-v1 (D81).
 #
-# Corre `scripts/empaquetar-sidecar.mjs` (PyInstaller --onedir + arrancar y
-# verificar /salud) y publica el ZIP resultante como asset de una GitHub
-# Release de ESTE repo (privado). El espejo público que consume la tarjeta
-# «ACELERADOR NATIVO» es `Jg-Stevan/e14-sidecar-releases`: solo el binario,
-# sin actas, sin datos de jurados y sin el código fuente del panel.
+# Corre `scripts/empaquetar-sidecar.mjs` (PyInstaller --onedir + verificación
+# estática del bundle) y publica el ZIP resultante como asset de una GitHub
+# Release de ESTE repo (privado). La tarjeta «ACELERADOR NATIVO» no apunta a la
+# release: el deploy del panel baja el asset y lo sirve partido en trozos de
+# < 25 MiB desde `/descargas/sidecar/`, porque un visitante no tiene login y
+# Pages rechaza archivos mayores. Solo va el binario: sin actas, sin datos de
+# jurados y sin el código fuente del panel.
 #
 # Vive en la RAÍZ del monorepo porque GitHub Actions solo ejecuta workflows de
 # `.github/workflows/`. El empaquetado corre con `working-directory:
 # apps/supervision-e14`; el ZIP queda en apps/supervision-e14/dist/.
 #
 # El NOMBRE del asset es parte del contrato de la UI: cambiarlo sin cambiar
-# `URL_DESCARGA_SIDECAR` en
-# componentes/e14/screens/masiva/acelerador.tsx deja el botón en un 404
-# silencioso. Lo fija `masiva/__tests__/acelerador-tarjeta.test.ts`.
+# `ARCHIVO_SIDECAR` en componentes/e14/screens/masiva/acelerador.tsx deja la
+# descarga en un 404 silencioso. Lo usan el deploy del panel
+# (`scripts/partir-descarga-sidecar.mjs`) y lo fija
+# `masiva/__tests__/acelerador-tarjeta.test.ts`.
 #
 # Corre en Windows porque PyInstaller NO cross-compila: un runner de Linux no
 # puede producir un .exe. El build local es el mismo script

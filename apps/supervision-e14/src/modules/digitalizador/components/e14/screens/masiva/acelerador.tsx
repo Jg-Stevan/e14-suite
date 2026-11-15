@@ -53,15 +53,18 @@ import {
   type SaludNativo,
 } from "@/modules/digitalizador/lib/e14/ocr/nativo";
 
-/** Asset publicado por `.github/workflows/sidecar-release.yml` en la release
- *  `latest`: la URL NO lleva versión a propósito, para que la tarjeta apunte
- *  siempre al build más reciente sin recompilar la app. Se exporta porque el
- *  NOMBRE del archivo es un contrato a tres bandas (esta URL ↔ el asset que
- *  sube el workflow ↔ el ZIP que produce `scripts/empaquetar-sidecar.mjs`) y un
+/** El nombre del ZIP es un contrato a tres bandas: el asset de la release que
+ *  sube `.github/workflows/sidecar-release.yml`, el que produce
+ *  `scripts/empaquetar-sidecar.mjs` y el que arma la página de descarga. Un
  *  desalineamiento es un 404 silencioso en un link. Lo fija
  *  `__tests__/acelerador-tarjeta.test.ts`. */
-export const URL_DESCARGA_SIDECAR =
-  "https://github.com/Jg-Stevan/supervision-e14/releases/latest/download/supervision-e14-sidecar-win-x64.zip";
+export const ARCHIVO_SIDECAR = "supervision-e14-sidecar-win-x64.zip";
+
+/** El ZIP (~108 MiB) no puede vivir como un asset > 25 MiB en Pages ni en una
+ *  release privada (el visitante no tiene login). La página pública del panel
+ *  baja las partes que deja el deploy y las reensambla en el navegador; el
+ *  nombre del archivo sigue siendo el de `ARCHIVO_SIDECAR`. */
+export const URL_DESCARGA_SIDECAR = "https://supervision-e14.pages.dev/descargas/sidecar/";
 
 /** Re-sondeo en modo AUSENTE (el que descarga y no vuelve a mirar la pantalla)
  *  y vigilancia de vida en ACTIVO/CAÍDO (P-21). 15 s = lo mismo que vale el
@@ -256,7 +259,7 @@ export function AceleradorNativo() {
           <a
             href={URL_DESCARGA_SIDECAR}
             className="inline-flex w-full items-center justify-center gap-1.5 rounded border border-[#00e599]/40 bg-[#061e19] px-2.5 py-1.5 font-mono text-[10px] font-bold tracking-wider text-[#00e599] shadow-[0_0_8px_rgba(0,229,153,0.12)] transition-all hover:bg-[#0c2f29] active:scale-[0.98]"
-            title="ZIP de Windows con el motor y los modelos dentro (~108 MiB). No necesita Python, ni git, ni instalador."
+            title="Abre la página que arma el ZIP de Windows (~108 MiB) desde sus partes. No necesita Python, ni git, ni instalador."
           >
             {caido ? "BAJAR EL ZIP DE NUEVO" : "DESCARGAR ZIP (≈108 MiB)"}
           </a>
