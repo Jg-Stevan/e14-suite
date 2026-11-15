@@ -1,0 +1,466 @@
+"use client";
+
+/**
+ * RESUMEN (§7.7 / C2) — "RESUMEN DE TRABAJO": progreso del puesto (barra
+ * segmentada de 12), tarjetas de estadística (cola offline / rescaneos) e
+ * historial de envíos con barra de acento por estado. Reactivo en vivo.
+ * Responsive 360→1280 (max-w-2xl en lg). La sección "ANÁLISIS DE LA
+ * JORNADA" (donut + barras recharts) fue ELIMINADA a pedido del mantenedor.
+ *
+ * KIT e14-observabilidad-v1 (agente 2 · C1): tuerca del modo de
+ * diagnóstico SIEMPRE visible arriba-izquierda del header (dev/
+ * TuercaResumen) — activación armada, panel desde C4.
+ * KIT e14-observabilidad-v1 (agente 2 · C3): el botón INFORME ZIP sale de
+ * Resumen — el flujo (lazy import generarInformeZip + downloadBlob,
+ * chequeo de cola vacía, mensajes) MIGRA a la sección Exportar del
+ * PanelDev (C4). Resumen queda con: barra segmentada, tarjetas,
+ * historial, reiniciar jornada y tuerca.
+ */
+import { useEffect, useState } from "react";
+import { useE14Store } from "@/lib/e14/store";
+import type { HistorialRow } from "@/lib/e14/fachada";
+import { PUESTO_SIMULADO } from "@/lib/e14/fachada";
+// KIT e14-puente-supervision-v1 (§7): tarjeta del puente al panel de
+// supervisión — estado del singleton + sincronización manual inline.
+import type { EstadoPuente } from "@/lib/e14/puente/tipos";
+import {
+  estadoPuente,
+  sincronizarAhora,
+  hubEnUso,
+  esOrigenLocal,
+  fijarHubLocal,
+} from "@/lib/e14/puente/envio";
+import { contarPendientes } from "@/lib/e14/puente/cola";
+import { SegmentedBar } from "../primitives";
+// KIT e14-observabilidad-v1 (agente 2 · C1): puerta del modo desarrollador.
+import { TuercaResumen } from "../dev/TuercaResumen";
+// KIT e14-observabilidad-v1 (agente 2 · C4): panel completo del modo dev.
+import { PanelDev } from "../dev/PanelDev";
+
+function badgeEstado(estado: HistorialRow["estado"]) {
+  switch (estado) {
+    case "ENVIADO":
+      return {
+        label: "ENVIADO ✓",
+        clases: "px-2.5 py-1 bg-[#10b981]/15 border border-[#10b981]/40 text-[#10b981] font-mono font-bold text-[11px]",
+        barra: "bg-[#10b981]",
+      };
+    case "RESCANEO_REQUERIDO":
+      return {
+        label: "RESCANEO ⚠️",
+        clases: "px-2.5 py-1 bg-[#ef4444]/15 border border-[#ef4444]/40 text-[#ef4444] font-mono font-bold text-[11px]",
+        barra: "bg-[#ef4444]",
+      };
+    default:
+      return {
+        label: "REVISIÓN HUMANA",
+        clases: "px-2.5 py-1 bg-amber-400/15 border border-amber-400/40 text-amber-400 font-mono font-bold text-[11px]",
+        barra: "bg-amber-400",
+      };
+  }
+}
+
+/** C-25 — una fila del historial: las SINTÉTICAS (guion del SIM) llevan
+ *  barra ámbar + badge «SIM» además del texto en la hora ("SIM") — a simple
+ *  vista no puede confundirse una fila SIM con una real. */
+function FilaHistorial({ fila, sim }: { fila: HistorialRow; sim: boolean }) {
+  const badge = badgeEstado(fila.estado);
+  return (
+    <div className="min-h-12 flex items-center justify-between gap-3 px-3.5 lg:px-5 py-2.5 lg:py-3 relative overflow-hidden hover:bg-slate-800/30 transition-colors">
+      <span
+        className={`absolute left-0 top-0 bottom-0 w-1 ${sim ? "bg-amber-400" : badge.barra}`}
+        aria-hidden
+      />
+      <span className="font-mono text-xs text-white pl-1.5 min-w-0 truncate font-semibold">
+        {sim && (
+          <span className="mr-2 inline-block px-1.5 py-px rounded bg-amber-500/15 border border-amber-500/50 text-amber-400 font-mono font-black text-[9px] tracking-widest align-middle">
+            SIM
+          </span>
+        )}
+        {fila.titulo}
+      </span>
+      <span className={`${badge.clases} whitespace-nowrap shrink-0 rounded-full shadow-xs`}>
+        {badge.label}
+      </span>
+    </div>
+  );
+}
+
+export function ResumenView() {
+  const mesas = useE14Store((s) => s.mesas);
+  const historial = useE14Store((s) => s.historial);
+  const puestoReal = useE14Store((s) => s.puestoActual);
+  const modoSimulacion = useE14Store((s) => s.modoSimulacion);
+  const puestoMostrado = puestoReal ?? (modoSimulacion ? PUESTO_SIMULADO : null);
+
+  const reiniciarJornada = useE14Store((s) => s.reiniciarJornada);
+  const [reiniciarArmado, setReiniciarArmado] = useState(false);
+  // KIT e14-observabilidad-v1 (agente 2 · C4): el panel SOLO se abre desde
+  // la tuerca (sin ruta ni query param).
+  const [panelAbierto, setPanelAbierto] = useState(false);
+  // KIT e14-puente-supervision-v1 (§7): estado del puente leído del
+  // singleton (snapshot COPIA) + cola pendiente real + feedback inline del
+  // botón (sin modales ni toasts — D2 del redesign).
+  const [puenteEstado, setPuenteEstado] = useState<EstadoPuente | null>(null);
+  const [puentePendientes, setPuentePendientes] = useState(0);
+  const [puenteSincronizando, setPuenteSincronizando] = useState(false);
+  const [puenteFeedback, setPuenteFeedback] = useState<string | null>(null);
+  // E2E LOCAL — el flujo celular → computador del mismo equipo (runbook
+  // `supervision-e14/docs/RUNBOOK-e2e-local-v1.md`). Cuando el digitalizador
+  // se abre desde una IP privada, el hub es el PROPIO origen: sin este botón
+  // habría que escribir `localStorage.setItem("e14-puente-url", …)` en la
+  // consola del celular, que nadie hace. Solo aparece en red local, nunca en
+  // la demo pública.
+  const [enRedLocal, setEnRedLocal] = useState(false);
+  const [hubUsado, setHubUsado] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      setEnRedLocal(esOrigenLocal());
+      setHubUsado(hubEnUso());
+    } catch {
+      /* silencioso — la tarjeta jamás rompe RESUMEN */
+    }
+  }, []);
+
+  const apuntarHubLocal = () => {
+    const origen = window.location.origin;
+    const nuevo = fijarHubLocal(hubUsado !== origen);
+    setHubUsado(nuevo ?? origen);
+    setPuenteFeedback(
+      nuevo === null
+        ? "El navegador bloqueó el almacenamiento: el hub no se pudo cambiar."
+        : nuevo === origen
+          ? "Puente apuntando a este equipo. Las actas llegan al panel en /supervision."
+          : "Puente devuelto al hub de producción."
+    );
+  };
+
+  useEffect(() => {
+    try {
+      setPuenteEstado(estadoPuente());
+      void contarPendientes().then((n) => setPuentePendientes(n));
+    } catch {
+      /* silencioso — la tarjeta jamás rompe RESUMEN */
+    }
+  }, []);
+
+  const sincronizarPuente = async (): Promise<void> => {
+    if (puenteSincronizando) return; // un ciclo a la vez (debounce del kit)
+    setPuenteSincronizando(true);
+    setPuenteFeedback("Sincronizando…");
+    try {
+      const resumen = await sincronizarAhora();
+      setPuenteFeedback(resumen.detalle);
+      setPuenteEstado(estadoPuente());
+      setPuentePendientes(await contarPendientes());
+    } catch {
+      setPuenteFeedback("Error: no se pudo sincronizar");
+    } finally {
+      setPuenteSincronizando(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!reiniciarArmado) return;
+    const t = window.setTimeout(() => setReiniciarArmado(false), 4000);
+    return () => window.clearTimeout(t);
+  }, [reiniciarArmado]);
+
+  const origenEquipo = typeof window === "undefined" ? "" : window.location.origin;
+  const hubEsLocal = hubUsado === origenEquipo;
+
+  // C-25 — filas SIM distinguibles: toggle LOCAL «ocultar filas SIM» +
+  // separador visual entre el historial REAL y el guion sintético (cada fila
+  // SIM lleva badge ámbar — a simple vista no se confunden).
+  const [ocultarSim, setOcultarSim] = useState(false);
+  const filasSim: HistorialRow[] = modoSimulacion
+    ? mesas
+        .flatMap((m) =>
+          m.paginas
+            .filter((p) => p.estado === "OK")
+            .map((p) => ({
+              id: `sim-${m.id}-${p.tipo}-${p.pagina}`,
+              titulo: `${m.id} · ${p.tipo} P${p.pagina}`,
+              estado: "ENVIADO" as const,
+              hora: "SIM",
+            })),
+        )
+        .reverse()
+    : [];
+  const mostrarSim = modoSimulacion && !ocultarSim && filasSim.length > 0;
+
+  const totalPaginas = mesas.reduce((n, m) => n + m.paginas.length, 0);
+  const paginasOk = mesas.reduce(
+    (n, m) => n + m.paginas.filter((p) => p.estado === "OK").length,
+    0,
+  );
+  const paginasRescaneo = mesas.reduce(
+    (n, m) => n + m.paginas.filter((p) => p.estado === "RESCANEO").length,
+    0,
+  );
+  const pendientes = totalPaginas - paginasOk;
+  const pct = totalPaginas > 0 ? Math.round((paginasOk / totalPaginas) * 100) : 0;
+  const ultimaActividad = historial[0]?.hora ?? "—";
+
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto thin-scroll bg-[#090d12] flex flex-col">
+      <header className="sticky top-0 z-40 w-full bg-[#090d12]/92 backdrop-blur-xl border-b border-slate-800/80 px-4 h-14 shrink-0 shadow-xs">
+        {/* KIT e14-observabilidad-v1 (agente 2 · C1): tuerca SIEMPRE visible
+            arriba-izquierda del header; el contenido se corre a la derecha
+            (pl) para despejar su blanco táctil de 44px. */}
+        <div className="absolute left-2 top-1/2 -translate-y-1/2 z-50">
+          <TuercaResumen onAbrirPanel={() => setPanelAbierto(true)} />
+        </div>
+        {/* Task 3: el contenido de la barra se alinea al ancho del contenedor
+            de la vista (en lg+ ya no queda pegado al borde del viewport). */}
+        <div className="max-w-md lg:max-w-2xl mx-auto w-full h-full flex items-center justify-between pl-[56px]">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-[#10b981] shrink-0" />
+            <h1 className="font-mono text-sm font-bold tracking-widest text-[#10b981] uppercase truncate">
+              RESUMEN DE TRABAJO
+            </h1>
+          </div>
+          <span className="font-mono text-[11px] text-slate-400 bg-slate-800/60 px-2 py-0.5 rounded-md border border-slate-700/60 whitespace-nowrap shrink-0">
+            {pct}% <span className="hidden min-[400px]:inline">TRANSMITIDO</span>
+          </span>
+        </div>
+      </header>
+
+      <div className="flex-grow flex flex-col gap-5 px-4 pt-4 pb-8 max-w-md lg:max-w-2xl mx-auto w-full">
+        {/* Puesto actual */}
+        <section className="bg-[#10161f] border border-slate-800 rounded-2xl p-4 lg:p-5 shadow-sm flex flex-col gap-2">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            PUESTO DE VOTACIÓN ASIGNADO
+          </span>
+          <h2 className="text-lg lg:text-xl font-bold text-white uppercase truncate">
+            {puestoMostrado?.titulo ?? "SIN PUESTO REGISTRADO"}
+          </h2>
+          {puestoMostrado && (
+            <div className="text-xs font-mono text-slate-400 border-t border-slate-800/80 pt-2 flex justify-between items-center">
+              <span>{`${puestoMostrado.municipio} › ZONA ${puestoMostrado.zona} › PTO ${puestoMostrado.puesto}`}</span>
+              <span className="font-bold text-slate-300">{mesas.length} MESAS</span>
+            </div>
+          )}
+        </section>
+
+        {/* Progreso del puesto */}
+        <div className="bg-[#10161f] border border-slate-800 p-4 lg:p-5 flex flex-col gap-3 rounded-2xl shadow-sm">
+          <div className="flex justify-between items-center">
+            <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider">
+              PROGRESO DE TRANSMISIÓN
+            </span>
+            <span className="font-mono font-extrabold text-lg text-[#10b981] tabular-nums">
+              {pct}%
+            </span>
+          </div>
+          <SegmentedBar total={totalPaginas} filled={paginasOk} tone="ok" />
+          <span className="text-xs text-slate-400 font-mono">
+            Completadas {paginasOk} de {totalPaginas} páginas del puesto.
+          </span>
+        </div>
+
+        {/* 3 Tarjetas de estadística KPI — Task 3: en lg+ más respiro */}
+        <div className="grid grid-cols-3 gap-2 lg:gap-4">
+          <div className="bg-[#10161f] border border-slate-800 p-3 lg:p-5 flex flex-col gap-1 rounded-2xl shadow-xs">
+            <span className="font-mono text-2xl lg:text-3xl font-extrabold tabular-nums text-[#10b981]">
+              {String(paginasOk).padStart(2, "0")}
+            </span>
+            <span className="font-mono text-[9px] lg:text-[10px] font-bold uppercase tracking-wider text-slate-400 leading-tight">
+              PÁGINAS TRANSMITIDAS
+            </span>
+          </div>
+          <div className="bg-[#10161f] border border-slate-800 p-3 lg:p-5 flex flex-col gap-1 rounded-2xl shadow-xs">
+            <span className="font-mono text-2xl lg:text-3xl font-extrabold tabular-nums text-amber-400">
+              {String(pendientes).padStart(2, "0")}
+            </span>
+            <span className="font-mono text-[9px] lg:text-[10px] font-bold uppercase tracking-wider text-slate-400 leading-tight">
+              PÁGINAS PENDIENTES
+            </span>
+          </div>
+          <div className="bg-[#10161f] border border-slate-800 p-3 lg:p-5 flex flex-col gap-1 rounded-2xl shadow-xs">
+            <span className="font-mono text-2xl lg:text-3xl font-extrabold tabular-nums text-[#ef4444]">
+              {String(paginasRescaneo).padStart(2, "0")}
+            </span>
+            <span className="font-mono text-[9px] lg:text-[10px] font-bold uppercase tracking-wider text-slate-400 leading-tight">
+              EN RESCANEO
+            </span>
+          </div>
+        </div>
+
+        {/* KIT e14-puente-supervision-v1 (§7): puente al panel de supervisión
+            — estilo idéntico a las tarjetas de arriba (misma piel del shell).
+            Feedback INLINE del botón (D2: sin modales, sin toasts nuevos). */}
+        <section className="bg-[#10161f] border border-slate-800 p-4 lg:p-5 flex flex-col gap-2.5 rounded-2xl shadow-sm">
+          <div className="flex justify-between items-center">
+            <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider">
+              PUENTE A SUPERVISIÓN
+            </span>
+            <span
+              className={`font-mono text-[10px] font-bold uppercase tracking-wider ${
+                puenteEstado && !puenteEstado.activo
+                  ? "text-red-400"
+                  : "text-[#10b981]"
+              }`}
+            >
+              {puenteEstado ? (puenteEstado.activo ? "ACTIVO" : "DETENIDO") : "—"}
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 font-mono">
+            Envía las actas ENVIADAS al panel de supervisión en vivo.
+          </p>
+          {hubUsado && (
+            <p className="text-[11px] font-mono text-slate-400 break-all">
+              hub: {hubUsado}
+            </p>
+          )}
+          <div className="text-[11px] font-mono text-slate-400 border-t border-slate-800/80 pt-2 flex flex-col gap-1">
+            <span>
+              {puentePendientes} pendientes · {puenteEstado?.enviadasOk ?? 0} enviadas
+              {puenteEstado?.ultimaSyncTs
+                ? ` · última ${new Date(puenteEstado.ultimaSyncTs).toLocaleTimeString()}`
+                : ""}
+            </span>
+            {puenteEstado?.ultimoError && (
+              <span className="text-amber-400 break-words">
+                Último error: {puenteEstado.ultimoError}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              void sincronizarPuente();
+            }}
+            disabled={puenteSincronizando}
+            aria-label="Sincronizar ahora con el panel de supervisión"
+            className="w-full min-h-[44px] px-4 rounded-xl border font-mono text-[11px] font-bold uppercase tracking-wider transition-all duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-wait border-emerald-500/40 bg-[#10161f] text-[#10b981] hover:border-emerald-400 hover:bg-emerald-500/10"
+          >
+            {puenteSincronizando ? "SINCRONIZANDO…" : "SINCRONIZAR AHORA"}
+          </button>
+          {enRedLocal && (
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={apuntarHubLocal}
+                aria-pressed={hubEsLocal}
+                aria-label="Apuntar el puente al hub local de este equipo"
+                className="w-full min-h-[44px] px-4 rounded-xl border font-mono text-[11px] font-bold uppercase tracking-wider transition-all duration-150 cursor-pointer border-sky-500/40 bg-[#10161f] text-sky-300 hover:border-sky-400 hover:bg-sky-500/10"
+              >
+                {hubEsLocal
+                  ? "HUB LOCAL: ESTE EQUIPO · tocar para producción"
+                  : "USAR HUB LOCAL (ESTE EQUIPO)"}
+              </button>
+              <a
+                href="/supervision/"
+                className="w-full min-h-[44px] px-4 py-3 rounded-xl border border-slate-700 text-center font-mono text-[11px] font-bold uppercase tracking-wider text-slate-300 no-underline hover:border-slate-500"
+              >
+                abrir panel de supervisión
+              </a>
+            </div>
+          )}
+          {puenteFeedback && (
+            <span className="text-[11px] font-mono text-slate-300">
+              {puenteFeedback}
+            </span>
+          )}
+        </section>
+
+        {/* Fin de jornada — el INFORME ZIP salió de aquí en C3 (migró al
+            PanelDev, sección Exportar) */}
+        <section className="flex flex-col items-center gap-2.5 pt-1">
+          <button
+            type="button"
+            onClick={() => {
+              if (!reiniciarArmado) {
+                setReiniciarArmado(true);
+                return;
+              }
+              setReiniciarArmado(false);
+              void reiniciarJornada();
+            }}
+            aria-label={
+              reiniciarArmado
+                ? "Confirmar reiniciar la jornada completa"
+                : "Reiniciar la jornada completa"
+            }
+            className={`w-full lg:max-w-sm min-h-[44px] px-4 rounded-xl border font-mono text-[11px] font-bold uppercase tracking-wider transition-all duration-150 cursor-pointer ${
+              reiniciarArmado
+                ? "border-red-500 text-red-400 bg-red-500/15 shadow-sm shadow-red-500/20"
+                : "border-slate-800 bg-[#10161f] text-slate-400 hover:border-red-500/50 hover:text-red-400"
+            }`}
+          >
+            {reiniciarArmado
+              ? "¿SEGURO? TOQUE DE NUEVO PARA REINICIAR JORNADA"
+              : "REINICIAR JORNADA"}
+          </button>
+        </section>
+
+        {/* Historial de envíos */}
+        <div className="flex flex-col gap-2.5 pt-2">
+          <div className="flex justify-between items-center gap-2">
+            <div className="flex flex-col">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                HISTORIAL DE TRANSMISIONES
+              </span>
+              {modoSimulacion && (
+                <span className="text-[10px] text-slate-400 font-mono">(DATOS EN MODO SIMULACIÓN)</span>
+              )}
+            </div>
+            {/* C-25 — filtro local del guion sintético (solo con filas SIM). */}
+            {modoSimulacion && filasSim.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setOcultarSim((v) => !v)}
+                aria-pressed={ocultarSim}
+                className="font-mono text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors whitespace-nowrap shrink-0"
+              >
+                {ocultarSim ? "MOSTRAR FILAS SIM" : "OCULTAR FILAS SIM"}
+              </button>
+            ) : (
+              <span className="font-mono text-[11px] text-slate-400">
+                {modoSimulacion ? `SIM ${paginasOk}/${totalPaginas}` : `ÚLT. ACT.: ${ultimaActividad}`}
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-col max-h-96 lg:max-h-[28rem] overflow-y-auto thin-scroll rounded-2xl border border-slate-800 bg-[#10161f] divide-y divide-slate-800/80 shadow-sm">
+            {historial.length === 0 && !mostrarSim ? (
+              <div className="p-4 text-center text-xs font-mono text-slate-400">
+                NO HAY ENVÍOS REGISTRADOS EN ESTA SESIÓN
+              </div>
+            ) : (
+              <>
+                {/* Historial REAL (siempre encima — nunca se mezcla con el
+                    guion del SIM sin su separador). */}
+                {historial.map((fila) => (
+                  <FilaHistorial key={fila.id} fila={fila} sim={false} />
+                ))}
+                {/* C-25 — separador visual + filas sintéticas con badge. */}
+                {mostrarSim && (
+                  <div
+                    role="separator"
+                    aria-label="Inicio de filas de simulación"
+                    className="flex items-center gap-2 px-3.5 lg:px-5 py-1.5 bg-amber-950/30 border-y border-amber-500/30"
+                  >
+                    <span className="font-mono text-[9px] font-black tracking-[0.2em] text-amber-400 uppercase">
+                      simulación · datos de prueba
+                    </span>
+                  </div>
+                )}
+                {mostrarSim &&
+                  filasSim.map((fila) => (
+                    <FilaHistorial key={fila.id} fila={fila} sim />
+                  ))}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* KIT e14-observabilidad-v1 (agente 2 · C4): panel de diagnóstico —
+          overlay fijo (z-[70]) montado desde la tuerca. */}
+      {panelAbierto && <PanelDev onClose={() => setPanelAbierto(false)} />}
+    </div>
+  );
+}

@@ -1,0 +1,35 @@
+{
+  "_comentario": "Assets que NO vienen en npm y se descargan al preparar el entorno. Cada entrada fija la URL exacta y el SHA-256 del archivo servido: si el origen devuelve otro contenido, scripts/preparar-assets.mjs detiene el build. Al actualizar un modelo, se sube versión/hash aquí en el mismo commit que cambie el código que lo consume.",
+  "_notas": [
+    "Los PP-OCRv4 salen del commit fijo 1cfba2e9 de SWHL/RapidOCR (rama main es móvil; el commit no cambia).",
+    "OpenCV es el build oficial de @techstark/opencv-js@4.5.5-release.2, servido por unpkg con la versión fija.",
+    "spa.traineddata.gz sale de naptha/tessdata en un commit fijo: desde D88 (2026-11-10) es 4.0.0_fast (1,14 MB comprimido; descomprime al tessdata_fast oficial de 2,29 MB, sha256 6f2e04d0…), el sabor que clasificó igual que best y tardó 1,5-2,8× menos en el banco on-device. Antes era 4.0.0_best (13,57 MB descomprimido). La RUTA lleva versión (/models/tess/4.0.0_fast/) para invalidar las tres cachés del modelo en equipos ya usados: IndexedDB de tesseract.js, MOTOR_CACHE del SW y HTTP (86400 s)."
+  ],
+  "archivos": [
+    {
+      "destino": "public/vendor/opencv-4.5.5-core.js",
+      "url": "https://unpkg.com/@techstark/opencv-js@4.5.5-release.2/dist/opencv.js",
+      "sha256": "8c33758c3ed6ead5d6d37837e1a7f2fbf7e21111e7bb9b9c41f3f6d59680e81b"
+    },
+    {
+      "destino": "public/models/tess/4.0.0_fast/spa.traineddata.gz",
+      "url": "https://raw.githubusercontent.com/naptha/tessdata/806cd9adc8c6e8abc11c782db1818c990576bebc/4.0.0_fast/spa.traineddata.gz",
+      "sha256": "8db1167a8c9bb015ac8e97278384c3b07dfa9bc8271569beea071d9e296b4487"
+    },
+    {
+      "destino": "public/models/rapidocr/ch_PP-OCRv4_det_infer.onnx",
+      "url": "https://huggingface.co/SWHL/RapidOCR/resolve/1cfba2e90fc938db55889873735088de210cc173/PP-OCRv4/ch_PP-OCRv4_det_infer.onnx",
+      "sha256": "d2a7720d45a54257208b1e13e36a8479894cb74155a5efe29462512d42f49da9"
+    },
+    {
+      "destino": "public/models/rapidocr/ch_PP-OCRv4_rec_infer.onnx",
+      "url": "https://huggingface.co/SWHL/RapidOCR/resolve/1cfba2e90fc938db55889873735088de210cc173/PP-OCRv4/ch_PP-OCRv4_rec_infer.onnx",
+      "sha256": "48fc40f24f6d2a207a2b1091d3437eb3cc3eb6b676dc3ef9c37384005483683b"
+    },
+    {
+      "destino": "public/models/rapidocr/ch_ppocr_mobile_v2.0_cls_infer.onnx",
+      "url": "https://huggingface.co/SWHL/RapidOCR/resolve/1cfba2e90fc938db55889873735088de210cc173/PP-OCRv1/ch_ppocr_mobile_v2.0_cls_infer.onnx",
+      "sha256": "e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c"
+    }
+  ]
+}

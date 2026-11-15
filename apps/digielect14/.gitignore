@@ -1,0 +1,108 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+.next/
+out/
+
+# production
+/build
+build/
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+local-*
+.claude
+.z-ai-config
+*.log
+dev.log
+dev.out.log
+test
+prompt
+
+server.log
+# Skills directory
+/skills/
+# artefactos de sesion / distribucion
+**/public/**/*.zip
+/tool-results
+tool-results/
+dev.log
+
+# Artefactos locales de auditoría/diseño (fuera del producto)
+/tmp-audit/
+/download/
+
+# ─── PRIVACIDAD Y ARTEFACTOS LOCALES ───────────────────────────────────────
+# Datos electorales reales: fotos de actas, capturas y volcados de corrida NO
+# se commitean. Los modelos se materializan en build: ver el bloque de abajo.
+/capturas/
+/assets-locales/
+/scratch/
+# SEC-10/D86 — jamás versionar actas reales ni capturas con datos de jurados
+actas-reales*/
+docs/capturas-*/
+*.onnx
+
+# ─── BINARIOS MATERIALIZADOS (bun run preparar) ────────────────────────────
+# scripts/sincronizar-vendor.mjs copia el vendor de node_modules y
+# scripts/preparar-assets.mjs baja OpenCV/modelos con URL y SHA-256 fijados en
+# scripts/assets.lock.json. Nada de esto se versiona.
+public/vendor/onnxruntime/
+public/vendor/tesseract/
+public/vendor/opencv-4.5.5-core.js
+public/wasm/zxing_reader.wasm
+public/models/tess/*.traineddata.gz
+public/models/tess/*.traineddata
+# D88: la RUTA del modelo lleva versión (/models/tess/4.0.0_fast/) — los
+# patrones planos de arriba no cubren la subcarpeta; el artefacto se baja en
+# `bun run preparar` y jamás se versiona.
+public/models/tess/**/*.traineddata.gz
+public/models/tess/**/*.traineddata
+public/models/rapidocr/*.onnx
+
+# Evidencia forense conservada a propósito en el repo (regresión D65 / zip 4f9c871):
+# los .log bajo docs/evidence/ son registro de verificación, no basura de dev.
+!docs/evidence/**/*.log
+
+# OpenNext
+.open-next
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+
+# Infraestructura del sandbox de desarrollo (NO es parte del producto)
+/.zscripts/
+/Caddyfile

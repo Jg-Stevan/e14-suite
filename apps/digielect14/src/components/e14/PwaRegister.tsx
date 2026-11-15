@@ -1,0 +1,57 @@
+"use client";
+
+/**
+ * F-PWA — montaje único del registro PWA del e14.
+ *
+ * Fuente: apps/scanner-lab/src/components/scanner/PwaRegister.tsx (repo
+ * web-scanner) — copia adaptada (regla de oro #0). ADAPTACIÓN declarada:
+ * el warm-up idle del OCR del lab NO aplica aquí — e14 ya tiene su propio
+ * pre-warm real de RapidOCR (kit e14-prowarm-ocr-v1: disparo al montar
+ * el shell + diferido 2 s en ScanView), no hay nada que duplicar.
+ *
+ * DEV-SIN-SW (fix de soporte): en DESARROLLO el service worker NO se
+ * registra y cualquier SW/caché de una sesión anterior se DESREGISTRA al
+ * montar. Motivo: el SW cachea assets (E-04) y con el dev server
+ * recompilando a cada cambio el usuario puede quedarse viendo una UI vieja
+ * («sigo viendo el chip KIT» pese a estar eliminado del código). En
+ * PRODUCCIÓN (build) el comportamiento es el de siempre: registro + banner
+ * de nueva versión E-04.
+ */
+import { useEffect } from "react";
+import { registerServiceWorker } from "@/lib/e14/core/pwa";
+// E-04 — banner «Nueva versión lista»: con el SW sin skipWaiting
+// incondicional, la versión nueva queda waiting hasta que el usuario acepte
+// recargar desde el banner (self-contained en src/lib/e14).
+import { setupUpdateBanner } from "@/lib/e14/update-banner";
+// KIT e14-instalacion-oficial-v1: la instalación va por el banner OFICIAL de
+// Chrome (beforeinstallprompt ya NO se intercepta). La píldora «Instalar app»
+// (pwa-instalar) se retiró.
+
+export function PwaRegister() {
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") {
+      // Dev: fuera cualquier SW viejo (best-effort — nunca bloquea la UI).
+      if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+        navigator.serviceWorker
+          .getRegistrations()
+          .then((regs) => {
+            for (const r of regs) void r.unregister();
+          })
+          .catch(() => {});
+        if (typeof caches !== "undefined") {
+          caches
+            .keys()
+            .then((keys) => {
+              for (const k of keys) void caches.delete(k);
+            })
+            .catch(() => {});
+        }
+      }
+      return;
+    }
+    registerServiceWorker();
+    setupUpdateBanner();
+  }, []);
+
+  return null;
+}
