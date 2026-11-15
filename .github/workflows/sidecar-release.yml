@@ -64,6 +64,14 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
+      # Los .onnx NO se versionan (.gitignore): los materializa este script con
+      # URL + SHA-256 de scripts/assets.lock.json. Sin este paso el checkout solo
+      # trae los .txt y PyInstaller arma un bundle sin det_v5_mobile.onnx que
+      # revienta al arrancar (NO_SUCHFILE), no al empaquetar.
+      - name: Preparar modelos OCR (URL + SHA-256 fijados)
+        working-directory: apps/supervision-e14
+        run: node scripts/preparar-assets.mjs
+
       - name: Empaquetar (venv + pip + PyInstaller + arrancar y verificar /salud)
         working-directory: apps/supervision-e14
         run: node scripts/empaquetar-sidecar.mjs
