@@ -48,8 +48,9 @@ function buildIdDeterminista(): string {
 const nextConfig: NextConfig = {
   // §6.5 — misma entrada → mismo BUILD_ID (ver buildIdDeterminista arriba).
   generateBuildId: async () => buildIdDeterminista(),
-  // Repo plano: la raíz del workspace ES la raíz del repo.
-  turbopack: { root: path.resolve(__dirname) },
+  // Monorepo: Turbopack debe resolver desde la raíz del workspace (lockfile),
+  // dos niveles arriba; con la raíz en la app no encuentra `next/package.json`.
+  turbopack: { root: path.resolve(__dirname, "..", "..") },
   // El motor vive en el PAQUETE (@jg-stevan/scanner-core, TypeScript fuente
   // vía bun workspaces) — se transpila junto a la app.
   transpilePackages: ["@jg-stevan/scanner-core"],
