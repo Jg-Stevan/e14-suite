@@ -10,6 +10,7 @@ name: deploy — supervision (Cloudflare Pages)
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     tags: ["v*"]
 
 permissions:
