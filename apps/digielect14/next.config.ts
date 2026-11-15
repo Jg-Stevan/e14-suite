@@ -48,6 +48,20 @@ function buildIdDeterminista(): string {
 const nextConfig: NextConfig = {
   // §6.5 — misma entrada → mismo BUILD_ID (ver buildIdDeterminista arriba).
   generateBuildId: async () => buildIdDeterminista(),
+  // COOP/COEP en el Worker: `public/_headers` solo aplica en Pages; el HTML
+  // del Workers lo sirve OpenNext y sin estas cabeceras crossOriginIsolated
+  // queda en false (OCR a 1 hilo).
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+        ],
+      },
+    ];
+  },
   // Monorepo: Turbopack debe resolver desde la raíz del workspace (lockfile),
   // dos niveles arriba; con la raíz en la app no encuentra `next/package.json`.
   turbopack: { root: path.resolve(__dirname, "..", "..") },
