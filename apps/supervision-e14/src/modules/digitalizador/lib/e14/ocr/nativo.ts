@@ -37,7 +37,10 @@ export async function sondearUrlSidecarDirecta(
     const res = await fetch(`${base}/salud`, {
       cache: "no-store",
       signal: control.signal,
-    });
+      // Chrome 142+: sin esto el fetch a 127.0.0.1 desde el sitio público
+      // puede quedar bloqueado por mixed content antes de pedir el permiso.
+      targetAddressSpace: "loopback",
+    } as RequestInit & { targetAddressSpace: "loopback" });
     if (!res.ok) return false;
     const j = (await res.json()) as Record<string, unknown>;
     return j?.ok === true;

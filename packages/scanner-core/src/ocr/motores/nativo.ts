@@ -38,6 +38,30 @@ export interface OcrNativoSalida {
   nBoxes: number;
 }
 
+/** Chrome 142+ exige Local Network Access para ir de un origen público a
+ *  loopback. El nombre `local-network-access` está PROHIBIDO: en versiones
+ *  viejas colgaba el renderer y try/catch no lo evita. Se consulta el permiso
+ *  granular y, si el navegador no lo conoce, se trata como legado (sin gate). */
+export type PermisoLoopback = "granted" | "prompt" | "denied" | "desconocido";
+
+export async function permisoLoopbackNativo(): Promise<PermisoLoopback> {
+  if (typeof navigator === "undefined" || !navigator.permissions?.query) return "desconocido";
+  try {
+    const estado = await navigator.permissions.query({
+      name: "loopback-network" as PermissionName,
+    });
+    return estado.state;
+  } catch {
+    return "desconocido";
+  }
+}
+
+/** `targetAddressSpace` no está en el lib.dom de TS todavía; el navegador lo
+ *  usa para eximir del bloqueo de mixed content ANTES de resolver DNS y para
+ *  verificar que 127.0.0.1 sigue siendo loopback. */
+type OpcionesFetchLoopback = RequestInit & { targetAddressSpace?: "local" | "loopback" };
+const OPCIONES_LOOPBACK: OpcionesFetchLoopback = { targetAddressSpace: "loopback" };
+
 /** Revalidación del sondeo de salud: barato (1 GET) y con memoria, para que un
  *  sidecar apagado no le cobre un timeout a cada acta. */
 const SALUD_TTL_MS = 15_000;
@@ -89,8 +113,10 @@ async function conTimeout<T>(hacer: (signal: AbortSignal) => Promise<T>, ms: num
   }
 }
 
-/** ¿El lado nativo está disponible? cachea el veredicto SALUD_TTL_MS. */
-export async function ladoNativoDisponible(): Promise<boolean> {
+/** ¿El lado nativo está disponible? cachea el veredicto SALUD_TTL_MS.
+ *  `timeoutMs` se amplía cuando la sonda la dispara un click: el prompt de
+ *  Local Network Access de Chrome puede tardar más que el timeout corto. */
+export async function ladoNativoDisponible(timeoutMs = SALUD_TIMEOUT_MS): Promise<boolean> {
   const url = urlBase();
   if (!url) {
     salud = null;
@@ -109,8 +135,8 @@ export async function ladoNativoDisponible(): Promise<boolean> {
   const tSonda = ahora;
   try {
     const res = await conTimeout(
-      (signal) => fetch(`${url}/salud`, { cache: "no-store", signal }),
-      SALUD_TIMEOUT_MS,
+      (signal) => fetch(`${url}/salud`, { cache: "no-store", signal, ...OPCIONES_LOOPBACK }),
+      timeoutMs,
     );
     ms = Math.round(performance.now() - tSonda);
     if (res.ok) {
@@ -169,6 +195,7 @@ export async function ocrNativo(dataUrl: string, cap: number): Promise<OcrNativo
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ imagen: dataUrl, cap }),
           signal,
+          ...OPCIONES_LOOPBACK,
         }),
       OCR_TIMEOUT_MS,
     );
@@ -237,6 +264,7 @@ export async function actaNativa(dataUrl: string, cap = 1280): Promise<ActaNativ
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ imagen: dataUrl, cap }),
           signal,
+          ...OPCIONES_LOOPBACK,
         }),
       ACTA_TIMEOUT_MS,
     );

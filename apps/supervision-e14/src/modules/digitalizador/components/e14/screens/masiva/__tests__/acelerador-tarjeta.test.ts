@@ -121,6 +121,31 @@ describe("acelerador — tarjeta del sidecar", () => {
     expect(nativo).toMatch(/catch\s*\{\s*return false/);
   });
 
+  test("LNA (Chrome 142+) — permiso granular y sonda solo con gesto del visitante", () => {
+    // Chrome bloquea https://supervision-e14.pages.dev → http://127.0.0.1
+    // hasta que el usuario conceda «Red local / Loopback». Un sondeo en
+    // segundo plano se deniega en silencio y la tarjeta diría «ausente» con
+    // un sidecar perfectamente vivo. Por eso: permiso granular, fetch con
+    // targetAddressSpace y el primer sondeo detrás de un click.
+    const tarjeta = leer(
+      "src/modules/digitalizador/components/e14/screens/masiva/acelerador.tsx",
+    );
+    expect(tarjeta).toMatch(/permisoLoopbackNativo/);
+    expect(tarjeta).toMatch(/PERMITIR ACCESO A RED LOCAL/);
+    expect(tarjeta).toMatch(/permisoRef\.current === "prompt" \|\| permisoRef\.current === "denied"/);
+    expect(tarjeta).toMatch(/sondear\(true, true\)/);
+    // En permiso/denegado el motor está desarmado: la sonda tiene que ir
+    // DIRECTO a la URL o el core contesta false sin tocar la red.
+    expect(tarjeta).toMatch(/actual === "permiso" \|\| actual === "denegado"/);
+
+    const core = leer("../../packages/scanner-core/src/ocr/motores/nativo.ts");
+    expect(core).toMatch(/loopback-network/);
+    expect(core).toMatch(/targetAddressSpace/);
+    // El alias combinado cuelga el renderer en Chrome viejos y try/catch no
+    // lo evita: la guía de Chrome lo prohíbe explícitamente.
+    expect(core).not.toMatch(/"local-network-access"/);
+  });
+
   test("la tarjeta es informativa: no importa el runner ni el gate", () => {
     const fuente = leer(
       "src/modules/digitalizador/components/e14/screens/masiva/acelerador.tsx",
