@@ -249,7 +249,8 @@ if (hijo.exitCode === null) {
 await new Promise((s) => setTimeout(s, 500));
 
 if (!salud || salud.ok !== true) {
-  console.error(`[empaquetar] ✘ el .exe NO respondió /salud en ${msArranque} ms`);
+  const fin = hijo.exitCode !== null ? `exit=${hijo.exitCode}` : `signal=${hijo.signalCode ?? "?"}`;
+  console.error(`[empaquetar] ✘ el .exe NO respondió /salud en ${msArranque} ms (${fin})`);
   console.error(salidaHijo.slice(-2000));
   process.exit(1);
 }
