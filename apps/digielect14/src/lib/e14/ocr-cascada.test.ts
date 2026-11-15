@@ -1,0 +1,461 @@
+/**
+ * Tests unitarios — KIT e14-ocr-cascada-v1 (K3 fase 2 — plan flujo-mantenedor
+ * paso 6). Patrón: runner-watchdog.test.ts (entorno node + mocks) + el
+ * patrón PURO de ocr-escalonado (la cascada recibe TODAS sus dependencias
+ * inyectadas — la producción (bridge) solo las arma).
+ *
+ * Cubre el contrato del brief K3 fase 2:
+ *  · cascada con mocks — AUTO directo (ahorra el re-OCR), core como hoy
+ *    (1280→1920), rescate ROI (gana y pierde).
+ *  · guard — cascadaActiva: flag OFF / SIM ⇒ false (byte-idéntico).
+ *  · elegirMejor JAMÁS recibe pasadas de motores distintos: el intento 1
+ *    de OTRO motor (futuro Tesseract) solo vale por el GATE.
+ *  · presupuesto vencido ⇒ no se abre ninguna etapa nueva.
+ *  · gate/ROI a prueba de fallos (jamás tumba — conservador).
+ *  · source-scan del bridge/flags (readFileSync — patrón
+ *    runner-rechequeo.test.ts): call-site condicional + doble whitelist.
+ */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+import {
+  cascadaActiva,
+  correrCascadaOcr,
+  pasadaRoiCompuesta,
+  ROI_FRACCIONES,
+  type DepsOcrCascada,
+  type PasadaCascada,
+} from "@jg-stevan/scanner-core/orquestacion/cascada";
+
+// fileURLToPath, no `.pathname`: en Windows .pathname devuelve "/C:/..." y
+// readFileSync falla — los anclas de contrato jamás corrían en ese SO.
+const raiz = fileURLToPath(new URL("../../..", import.meta.url));
+const lee = (ruta: string): string => readFileSync(`${raiz}${ruta}`, "utf8");
+
+/** Pasada de prueba — conf/comparables SOLO entre pasadas del mismo motor. */
+function pasada(
+  texto: string,
+  conf = 0.9,
+  cap: number | "roi" | "tess" = 1280,
+): PasadaCascada {
+  return { texto, conf, cap, msDet: 10, msRec: 20 };
+}
+
+/** Texto con las anclas del brief (cabecera-céntrica + pie). */
+const TEXTO_AUTO = [
+  "TARJETA ELECTORAL E-14",
+  "REGISTRADURIA NACIONAL",
+  "PAÍS: 88 CONSULADO: 1",
+  "ZONA: 01 PUESTO: 0002",
+  "MESA: 001",
+  "Ver.: 1 Pag.: 1 de 2",
+  "KIT: 399",
+  "202610271234567",
+].join("\n");
+const TEXTO_DEBIL = "MANCHA ILEGIBLE"; // sin anclas, sin mesa, <150 chars → necesitaSegunda true
+const TEXTO_ROI_BUENO = "MESA: 001 KIT: 399 SUMA TOTAL"; // rescate que recompone
+
+/** Deps por defecto: intento1 = 1280 débil; core igual; ROI rescata bien. */
+function depsBase(
+  overrides: Partial<DepsOcrCascada> = {},
+): DepsOcrCascada & {
+  llamadas: { intento1: number; ocr1280: number; ocr1920: number; ocrRoi: number; recortar: number };
+} {
+  const llamadas = { intento1: 0, ocr1280: 0, ocr1920: 0, ocrRoi: 0, recortar: 0 };
+  return {
+    llamadas,
+    intento1: async (foto) => {
+      llamadas.intento1 += 1;
+      return pasada(`${TEXTO_DEBIL}${foto ? "" : ""}`, 0.5, 1280);
+    },
+    mismoMotorIntento1: true,
+    ocr1280: async () => {
+      llamadas.ocr1280 += 1;
+      return pasada(TEXTO_DEBIL, 0.5, 1280);
+    },
+    ocr1920: async () => {
+      llamadas.ocr1920 += 1;
+      return pasada(TEXTO_DEBIL, 0.6, 1920);
+    },
+    ocrRoi: async () => {
+      llamadas.ocrRoi += 1;
+      return pasada(TEXTO_ROI_BUENO, 0.8, "roi");
+    },
+    recortarRoi: async () => {
+      llamadas.recortar += 1;
+      return "data:image/jpeg;base64,roi";
+    },
+    clasificarNivel: (texto) => (texto.includes("E-14") && texto.includes("MESA") ? "AUTO" : "MANUAL"),
+    presupuestoVencido: () => false,
+    ...overrides,
+  };
+}
+
+describe("ocr-cascada · cascadaActiva (guard del call-site)", () => {
+  it("flag OFF ⇒ false (el bridge corre el escalonado de siempre byte a byte)", () => {
+    expect(cascadaActiva(false, false)).toBe(false);
+    expect(cascadaActiva(false, undefined)).toBe(false);
+  });
+  it("flag ON + no-SIM ⇒ true; SIM NUNCA (chips 8.2/7.0/4.3 intactos)", () => {
+    expect(cascadaActiva(true, false)).toBe(true);
+    expect(cascadaActiva(true, undefined)).toBe(true);
+    expect(cascadaActiva(true, true)).toBe(false);
+  });
+});
+
+describe("ocr-cascada · ROI_FRACCIONES (contrato del brief K3)", () => {
+  it("top 0-25% y bottom 75-100% del warp", () => {
+    expect(ROI_FRACCIONES.top).toEqual([0, 0.25]);
+    expect(ROI_FRACCIONES.bottom).toEqual([0.75, 1]);
+  });
+});
+
+describe("ocr-cascada · pasadaRoiCompuesta (solo pasadas útiles)", () => {
+  it("sin ROIs útiles → null (no hay rescate)", () => {
+    expect(pasadaRoiCompuesta(null, null)).toBe(null);
+    expect(pasadaRoiCompuesta(pasada("   ", 0.5, "roi"), pasada("", 0.5, "roi"))).toBe(null);
+  });
+  it("un solo ROI útil → su texto y su conf, cap roi", () => {
+    const c = pasadaRoiCompuesta(pasada("KIT: 399", 0.7, "roi"), null);
+    expect(c).not.toBe(null);
+    expect(c?.texto).toBe("KIT: 399");
+    expect(c?.conf).toBe(0.7);
+    expect(c?.cap).toBe("roi");
+  });
+  it("dos ROIs útiles → textos unidos con \\n y conf = media", () => {
+    const c = pasadaRoiCompuesta(pasada("E-14 MESA: 001", 0.6, "roi"), pasada("SUMA TOTAL", 0.8, "roi"));
+    expect(c?.texto).toBe("E-14 MESA: 001\nSUMA TOTAL");
+    expect(c?.conf).toBeCloseTo(0.7, 10);
+  });
+  it("un ROI vacío no aporta NI texto NI conf (media solo entre útiles)", () => {
+    const c = pasadaRoiCompuesta(pasada("E-14", 0.4, "roi"), pasada("  \n  ", 0.99, "roi"));
+    expect(c?.texto).toBe("E-14");
+    expect(c?.conf).toBe(0.4);
+  });
+});
+
+describe("ocr-cascada · correrCascadaOcr (cascada con mocks)", () => {
+  it("AUTO directo en el intento 1 ⇒ UNA sola pasada, sin 1920 ni ROI (ahorro del re-OCR)", async () => {
+    const d = depsBase();
+    d.intento1 = async () => {
+      d.llamadas.intento1 += 1; // el override reemplaza el stub contado — se re-cuenta aquí
+      return pasada(TEXTO_AUTO, 0.9, 1280);
+    };
+    const s = await correrCascadaOcr("data:x", d);
+    expect(s.paso).toBe("intento1");
+    expect(s.elegidoCap).toBe(1280);
+    expect(s.rescate).toBe(false);
+    expect(s.texto).toContain("MESA: 001");
+    expect(d.llamadas.intento1).toBe(1);
+    expect(d.llamadas.ocr1280).toBe(0);
+    expect(d.llamadas.ocr1920).toBe(0);
+    expect(d.llamadas.ocrRoi).toBe(0);
+    expect(d.llamadas.recortar).toBe(0);
+  });
+
+  it("sin AUTO y lectura débil ⇒ core como hoy (1920) + rescate ROI que GANA (más anclas)", async () => {
+    const d = depsBase();
+    const s = await correrCascadaOcr("data:x", d);
+    expect(d.llamadas.intento1).toBe(1);
+    expect(d.llamadas.ocr1280).toBe(0); // mismo motor ⇒ la 1.ª pasada se REUSA
+    expect(d.llamadas.ocr1920).toBe(1);
+    expect(d.llamadas.recortar).toBe(2); // top + bottom
+    expect(d.llamadas.ocrRoi).toBe(2);
+    expect(s.rescate).toBe(true);
+    expect(s.paso).toBe("roi");
+    expect(s.elegidoCap).toBe("roi");
+    expect(s.texto).toBe(`${TEXTO_ROI_BUENO}\n${TEXTO_ROI_BUENO}`); // top + bottom unidos
+    expect(s.ms1280).toBe(null);
+  });
+
+  it("rescate ROI que PIERDE ⇒ el core queda (elegirMejor mismo motor manda)", async () => {
+    const d = depsBase({ ocrRoi: async () => pasada("basura", 0.1, "roi") });
+    const s = await correrCascadaOcr("data:x", d);
+    expect(s.rescate).toBe(true); // el rescate CORRIÓ (intento)
+    expect(s.paso).toBe("roi"); // la compuesta entró a elegirMejor
+    expect(s.texto).toBe(TEXTO_DEBIL); // pero el core de 1920 ganó (conf 0.6 > 0.1)
+  });
+
+  it("ROI fallidos (recorte null + ocrRoi lanza) ⇒ sin rescate, core intacto, JAMÁS tumba", async () => {
+    const d = depsBase({
+      recortarRoi: async () => null,
+      ocrRoi: async () => {
+        throw new Error("roi roto");
+      },
+    });
+    const s = await correrCascadaOcr("data:x", d);
+    expect(s.rescate).toBe(false);
+    expect(s.paso).toBe("1920"); // escalonado completo de siempre
+    expect(s.elegidoCap).toBe(1920);
+    expect(s.texto).toBe(TEXTO_DEBIL);
+  });
+
+  it("GO-B (intento 1 de OTRO motor): su texto JAMÁS entra a elegirMejor", async () => {
+    // Tesseract simulado: cap "tess" + motor "tesseract". El gate NO le da
+    // AUTO → el core abre su PROPIA 1.ª pasada y TODO lo que entra a
+    // elegirMejor es RapidOCR (1280/1920/roi) — jamás la pasada Tess.
+    let vioTess = false;
+    const elegirEspia = async (deps: DepsOcrCascada, foto: string) => {
+      const s = await correrCascadaOcr(foto, deps);
+      if (s.elegidoCap === "tess") vioTess = true;
+      return s;
+    };
+    const d = depsBase({
+      intento1: async () => ({ ...pasada("TESSERACT DEBIL", 0.95, "tess"), motor: "tesseract" }),
+      mismoMotorIntento1: false,
+    });
+    const s = await elegirEspia(d, "data:x");
+    expect(vioTess).toBe(false);
+    expect(d.llamadas.ocr1280).toBe(1); // core abre su 1.ª pasada propia
+    expect(s.elegidoCap).not.toBe("tess");
+    expect(s.ms1280).not.toBe(null);
+  });
+
+  it("GO-B: Tesseract con gate AUTO ⇒ listo SIN core (el gate decide entre motores)", async () => {
+    const d = depsBase({
+      intento1: async () => ({ ...pasada(`${TEXTO_AUTO} (tess)`, 0.7, "tess"), motor: "tesseract" }),
+      mismoMotorIntento1: false,
+    });
+    const s = await correrCascadaOcr("data:x", d);
+    expect(s.paso).toBe("intento1");
+    expect(s.elegidoCap).toBe("tess"); // el texto del intento 1 viaja POR EL GATE
+    expect(s.motorIntento1).toBe("tesseract");
+    expect(d.llamadas.ocr1280).toBe(0);
+    expect(d.llamadas.ocr1920).toBe(0);
+    expect(d.llamadas.ocrRoi).toBe(0);
+  });
+
+  it("GO-B CAÍDA HONESTA: Tess vencido ⇒ intento1 RapidOCR (motor declarado) ⇒ SE REUSA (no se paga dos veces)", async () => {
+    const d = depsBase({ mismoMotorIntento1: false });
+    d.intento1 = async () => {
+      d.llamadas.intento1 += 1;
+      return { ...pasada(TEXTO_DEBIL, 0.5, 1280), motor: "rapidocr" }; // fallback del bridge
+    };
+    const s = await correrCascadaOcr("data:x", d);
+    expect(d.llamadas.intento1).toBe(1);
+    expect(d.llamadas.ocr1280).toBe(0); // REUSADA — el core no repite la 1.ª pasada
+    expect(s.motorIntento1).toBe("rapidocr");
+    expect(s.ms1280).toBe(null);
+  });
+
+  it("GO-B: retro-compat — pasada sin motor + mismoMotorIntento1 true ⇒ reuso histórico intacto", async () => {
+    const d = depsBase(); // intento1 sin campo motor (pasadas históricas)
+    const s = await correrCascadaOcr("data:x", d);
+    expect(d.llamadas.ocr1280).toBe(0); // la 1.ª pasada YA pagada se reusa
+    expect(s.motorIntento1).toBe("rapidocr");
+  });
+
+  it("presupuesto vencido ⇒ ni 1920 ni ROI (el timeout EXISTENTE manda — §3)", async () => {
+    const d = depsBase({ presupuestoVencido: () => true });
+    const s = await correrCascadaOcr("data:x", d);
+    expect(d.llamadas.ocr1920).toBe(0);
+    expect(d.llamadas.recortar).toBe(0);
+    expect(s.paso).toBe("1280"); // la 1.ª pasada (reusada) es lo que hay
+    expect(s.rescate).toBe(false);
+  });
+
+  it("gate que LANZA ⇒ tratado MANUAL (conservador — sigue como hoy)", async () => {
+    const d = depsBase({
+      clasificarNivel: () => {
+        throw new Error("divipol caída");
+      },
+    });
+    const s = await correrCascadaOcr("data:x", d);
+    expect(s.paso).toBe("roi"); // la cascada siguió completa sin morir
+    expect(s.texto).toBe(`${TEXTO_ROI_BUENO}\n${TEXTO_ROI_BUENO}`);
+  });
+
+  it("lectura FUERTE pero sin AUTO ⇒ SIN rescate (el ROI no arregla clasificación)", async () => {
+    // TEXTO_AUTO-like pero el gate lo niega: necesitaSegunda=false (FUERTE)
+    // ⇒ el rescate no corre (falla la ruta, no la lectura).
+    const d = depsBase({
+      clasificarNivel: () => "MANUAL",
+      intento1: async () => pasada(TEXTO_AUTO, 0.9, 1280),
+    });
+    const s = await correrCascadaOcr("data:x", d);
+    expect(d.llamadas.ocr1920).toBe(0); // necesitaSegunda false (FUERTE)
+    expect(d.llamadas.recortar).toBe(0); // sin rescate
+    expect(s.rescate).toBe(false);
+    expect(s.paso).toBe("1280");
+  });
+
+  it("rescateMotor AUSENTE ⇒ cascada de siempre byte a byte (ninguna etapa nueva)", async () => {
+    const d = depsBase();
+    const s = await correrCascadaOcr("data:x", d);
+    expect(s.msMotor).toBeNull();
+    expect(s.paso).toBe("roi");
+  });
+
+  it("KIT e14-velocidad-5s-v1: el otro motor SOLO corre si el core cerró SIN AUTO, y SALVA", async () => {
+    let motor = 0;
+    const d = depsBase({
+      rescateMotor: async () => {
+        motor += 1;
+        return pasada(TEXTO_AUTO, 0.85, "tess");
+      },
+    });
+    const s = await correrCascadaOcr("data:x", d);
+    expect(motor).toBe(1);
+    expect(s.paso).toBe("rescate-motor");
+    expect(s.elegidoCap).toBe("tess");
+    expect(s.msMotor).toBeTypeOf("number");
+  });
+
+  it("rescateMotor que NO llega a AUTO ⇒ manda el core (entre motores jamás decide elegirMejor)", async () => {
+    const d = depsBase({
+      rescateMotor: async () => pasada("BASURA DEL OTRO MOTOR", 0.99, "tess"),
+    });
+    const s = await correrCascadaOcr("data:x", d);
+    expect(s.paso).toBe("roi");
+    expect(s.elegidoCap).not.toBe("tess");
+    expect(s.msMotor).toBeTypeOf("number"); // corrió y se midió honesto
+  });
+
+  it("rescateMotor con AUTO en el intento 1 ⇒ JAMÁS se paga (el caso fácil no lo espera)", async () => {
+    let motor = 0;
+    const d = depsBase({
+      intento1: async () => pasada(TEXTO_AUTO, 0.9, 1280),
+      rescateMotor: async () => {
+        motor += 1;
+        return pasada(TEXTO_AUTO, 0.9, "tess");
+      },
+    });
+    const s = await correrCascadaOcr("data:x", d);
+    expect(motor).toBe(0);
+    expect(s.paso).toBe("intento1");
+    expect(s.msMotor).toBeNull();
+  });
+
+  it("rescateMotor con presupuesto vencido ⇒ no se abre (mismo §3 que 1920 y ROI)", async () => {
+    let motor = 0;
+    const d = depsBase({
+      presupuestoVencido: () => true,
+      rescateMotor: async () => {
+        motor += 1;
+        return pasada(TEXTO_AUTO, 0.9, "tess");
+      },
+    });
+    const s = await correrCascadaOcr("data:x", d);
+    expect(motor).toBe(0);
+    expect(s.msMotor).toBeNull();
+  });
+
+  it("rescateMotor que LANZA ⇒ se descarta (jamás tumba el acta)", async () => {
+    const d = depsBase({
+      rescateMotor: async () => {
+        throw new Error("tesseract no disponible");
+      },
+    });
+    const s = await correrCascadaOcr("data:x", d);
+    expect(s.paso).toBe("roi");
+    expect(s.msMotor).toBeTypeOf("number");
+  });
+});
+
+describe("ocr-cascada · source-scan (contrato del kit en src/)", () => {
+  it("bridge: call-site condicional con cascadaActiva + escalonado intacto + GO-B activo", () => {
+    const bridge = lee("src/lib/e14/scanner-core-bridge.ts");
+    // FASE F (plan post-v2.3): el CUERPO de §5 vive en pipeline.ts (el bridge
+    // lo ejecuta con pasos INYECTADOS) — el call-site del OCR se coteja ahí,
+    // con el prefijo `pasos.` que prueba que va por la inyección.
+    const pipeline = lee("src/lib/e14/pipeline.ts");
+    expect(pipeline).toContain("cascadaActiva(leerFlags().ocrCascada");
+    expect(pipeline).toContain("pasos.reconocerRapidOcrCascada(fotoOcr, onProgresoOcr, cfgOcr)");
+    expect(pipeline).toContain("pasos.reconocerRapidOcrEscalonado(fotoOcr, onProgresoOcr, cfgOcr)");
+    expect(bridge).toContain("OCR_CASCADA_TESSERACT_GO = true");
+    expect(bridge).toContain("recortarRoiDataUrl");
+    // KIT e14-ocr-tessbest-v1: el intento 1 ES tessReconocer con caída
+    // honesta a RapidOCR 1280 (motor:"rapidocr" — pasada reutilizable). El
+    // presupuesto viaja COMPLETO (restante del pipeline): la creación de la
+    // 1.ª vez lleva su ventana propia de 180 s DENTRO del módulo.
+    expect(bridge).toContain("await tessReconocer(foto, restante)");
+    expect(bridge).toContain('motor: "rapidocr"');
+    // Espera del warm-up del worker OpenCV POR TIER (BAJO 20 s — evidencia v4).
+    expect(pipeline).toContain("pasos.esperarWorkerCaliente(esperaWorkerEfectiva())");
+  });
+  it("flags: default ON (GO-B del mantenedor) + DOBLE whitelist (sanearFlags + leerOverridesFlags)", () => {
+    const flags = lee("src/lib/e14/flags.ts");
+    expect(flags).toContain("ocrCascada: true,");
+    expect(flags).toContain('limpio.ocrCascada = p.ocrCascada;');
+    const politica = lee("src/lib/e14/obs/politica.ts");
+    expect(politica).toContain('limpio.ocrCascada = o.ocrCascada;');
+    expect(politica).toContain("limpio.presupuestoEscaneoMs");
+  });
+  it("tess vendido: assets en public/ (worker + core simd-lstm + spa fast)", () => {
+    const pub = lee("public/vendor/tesseract/tesseract-core-simd-lstm.wasm.js").length;
+    expect(pub).toBeGreaterThan(1_000_000); // glue del core presente
+    expect(lee("public/vendor/tesseract/worker.min.js").length).toBeGreaterThan(50_000);
+    // D88: la ruta lleva versión y el sabor servido es fast (~1,1 MB gz).
+    const gz = lee("public/models/tess/4.0.0_fast/spa.traineddata.gz").length;
+    expect(gz).toBeGreaterThan(1_000_000);
+  });
+  it("obs/tipos.ts: FlagsApp + ocrCascada (D57 — al final, tras qrBrujulaOrientacion)", () => {
+    const tipos = lee("src/lib/e14/obs/tipos.ts");
+    const brujula = tipos.indexOf("qrBrujulaOrientacion: boolean;");
+    const cascada = tipos.indexOf("ocrCascada: boolean;");
+    expect(brujula).toBeGreaterThan(-1);
+    expect(cascada).toBeGreaterThan(brujula); // ADITIVO AL FINAL (contrato D57)
+    expect(tipos.slice(cascada)).toContain("presupuestoEscaneoMs"); // el kit nuevo va AL FINAL
+  });
+});
+
+// KIT e14-velocidad-5s-v1 — RECHAZO TEMPRANO. El mecanismo NO es una regla
+// nueva de la cascada: el bridge declara el presupuesto vencido cuando el
+// veredicto ya está bloqueado antes del OCR, y las tres escaladas (re-OCR 1920,
+// ROI, motor de rescate) ya están guardadas por ESA MISMA señal en el módulo
+// puro — arriba hay pruebas de comportamiento para ese caso («presupuesto
+// vencido ⇒ no abre»). Lo que se coteja acá es el ALAMBRE: que la señal llegue
+// a las dos rutas (cascada y escalonado), al rescate de bordes del motor y que
+// la verificación del guard se coseche UNA sola vez (antes del OCR).
+describe("e14-velocidad-5s-v1 · rechazo temprano (source-scan)", () => {
+  // FASE F (plan post-v2.3): el cuerpo de §5 vive en pipeline.ts; los helpers
+  // de la cascada siguen en el bridge. El alambre se coteja sobre AMBOS.
+  const bridge = lee("src/lib/e14/scanner-core-bridge.ts");
+  const pipeline = lee("src/lib/e14/pipeline.ts");
+  const fuente = `${bridge}\n${pipeline}`;
+  it("el veredicto bloqueado se calcula con la verificación del guard (pre-OCR)", () => {
+    expect(fuente).toContain("const rechazoTemprano =");
+    // C-30 — el veredicto efectivo es el RE-LEÍDO por la postura IMPORTAR
+    // (completitudEfectiva; para CÁMARA es byte-idéntico al del guard).
+    expect(fuente).toContain("!completitudEfectiva.completa;");
+    // La relajación SOLO aplica a la vía ARCHIVO (el gate de cámara intacto).
+    expect(pipeline).toContain('opciones.fuente === "ARCHIVO"');
+    // UNA sola cosecha de la promesa: la declaración vieja (junto al gate) fue
+    // BORRADA, no duplicada — si vuelve a aparecer hay dos verificaciones.
+    expect(
+      fuente.match(/const verificacionResuelta = verificacion \? await verificacion : null;/g)
+    ).toHaveLength(1);
+    // Y esa cosecha vive ANTES de la llamada al OCR (no después del gate).
+    expect(fuente.indexOf("const rechazoTemprano =")).toBeLessThan(
+      fuente.indexOf("reconocerRapidOcrCascada(fotoOcr, onProgresoOcr, cfgOcr)")
+    );
+  });
+  it("la señal viaja en cfgOcr y cortan las DOS rutas de escalada", () => {
+    expect(fuente).toContain("corteIncompleta: rechazoTemprano,");
+    // Cascada: presupuesto vencido de entrada + Tess de intento 1 jamás se paga.
+    expect(fuente).toContain("cfg.corteIncompleta === true ||");
+    expect(fuente).toContain("if (rapidaPrimero || cfg.corteIncompleta === true) return rapid1280(foto);");
+    // Escalonado (flag OFF y recorte): la misma puerta en tocaSegunda.
+    expect(fuente).toContain("escalonado.corteIncompleta !== true &&");
+  });
+  it("el rescate de bordes del motor también se corta (sin rescate = 26/42 líneas leídas)", () => {
+    expect(fuente).toContain("sinRescateBordes: cfg.corteIncompleta === true");
+    expect(fuente).toContain("sinRescateBordes: escalonado.corteIncompleta === true");
+    const motor = lee("../../packages/scanner-core/src/ocr/rapidocr.ts");
+    expect(motor).toContain("sinRescateBordes?: boolean");
+    expect(motor).toContain("&& !opts?.sinRescateBordes) {");
+  });
+  it("la banda del sello NO se corta (el panel de corrección del operador la necesita)", () => {
+    expect(pipeline).toContain("if (!opciones.simular && tipoDeBanda(texto) === null) {");
+  });
+  it("flag default ON con DOBLE whitelist y D57 aditivo al final", () => {
+    const flags = lee("src/lib/e14/flags.ts");
+    expect(flags).toContain("ocrCorteIncompleta: true,");
+    expect(flags).toContain("limpio.ocrCorteIncompleta = p.ocrCorteIncompleta;");
+    expect(lee("src/lib/e14/obs/politica.ts")).toContain(
+      "limpio.ocrCorteIncompleta = o.ocrCorteIncompleta;"
+    );
+    const tipos = lee("src/lib/e14/obs/tipos.ts");
+    expect(tipos.indexOf("ocrCorteIncompleta")).toBeGreaterThan(tipos.indexOf("ocrSegundaTopeMs"));
+  });
+});
