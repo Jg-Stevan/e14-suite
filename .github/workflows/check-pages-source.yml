@@ -1,0 +1,36 @@
+name: check — Pages source (temporal)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Consultar integración Git de ambos proyectos
+        run: |
+          set -euo pipefail
+          for p in supervision-e14 digielect14; do
+            echo "## $p"
+            curl -sS -H "Authorization: Bearer $CF_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/pages/projects/$p" \
+              | node -e '
+                  let s = "";
+                  process.stdin.on("data", d => s += d).on("end", () => {
+                    const j = JSON.parse(s);
+                    if (!j.success) { console.log(JSON.stringify(j.errors)); return; }
+                    const r = j.result;
+                    console.log(JSON.stringify({
+                      source: r.source ?? null,
+                      domains: r.domains,
+                      latest: r.latest_deployment ? r.latest_deployment.url : null
+                    }));
+                  });
+                '
+          done
