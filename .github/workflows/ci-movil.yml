@@ -1,0 +1,31 @@
+# CI de la app móvil — digielect14 (paths-filter: app + motor)
+# NOTA: scaffold. Alinear con el quality.yml del repo viejo (cota bundle 20 MB,
+# smokes byte a byte) si 'verificar' no cubre todo eso.
+name: ci — movil (digielect14)
+
+on:
+  push:
+    branches: [main]
+    paths: ["apps/digielect14/**", "packages/scanner-core/**"]
+  pull_request:
+    paths: ["apps/digielect14/**", "packages/scanner-core/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: instalar workspaces (lockfile de la raíz)
+        run: bun install --frozen-lockfile
+
+      - name: verificar (preparar + typecheck + lint + vitest + test:paquete)
+        working-directory: apps/digielect14
+        run: bun run verificar

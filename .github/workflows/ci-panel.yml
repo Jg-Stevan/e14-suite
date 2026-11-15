@@ -1,0 +1,31 @@
+# CI del panel — supervision-e14 (paths-filter: app + motor)
+# NOTA: scaffold. El panel usa bun:test con bunfig.toml + preload; 'verificar'
+# debe existir en su package.json (si tiene otro nombre, ajusta el paso).
+name: ci — supervision (supervision-e14)
+
+on:
+  push:
+    branches: [main]
+    paths: ["apps/supervision-e14/**", "packages/scanner-core/**"]
+  pull_request:
+    paths: ["apps/supervision-e14/**", "packages/scanner-core/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: instalar workspaces (lockfile de la raíz)
+        run: bun install --frozen-lockfile
+
+      - name: verificar del panel
+        working-directory: apps/supervision-e14
+        run: bun run verificar

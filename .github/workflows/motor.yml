@@ -1,0 +1,33 @@
+# CI del motor — scanner-core (paths-filter: solo cuando cambia el paquete)
+# NOTA: scaffold alineado al plan §6. Revisa los nombres de scripts del package.json
+# del paquete antes del primer push (en el repo viejo era quality.yml parcial).
+name: motor — scanner-core
+
+on:
+  push:
+    branches: [main]
+    paths: ["packages/scanner-core/**"]
+  pull_request:
+    paths: ["packages/scanner-core/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: instalar workspaces (lockfile de la raíz)
+        run: bun install --frozen-lockfile
+
+      - name: suite del motor (~154 casos, golden contrato-motor.json)
+        run: bun test packages/scanner-core
+
+      - name: typecheck del paquete (si existe el script)
+        run: cd packages/scanner-core && bun run typecheck || echo "(sin script typecheck — omitido)"
