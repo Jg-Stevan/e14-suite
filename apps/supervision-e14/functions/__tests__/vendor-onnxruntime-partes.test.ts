@@ -20,7 +20,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
-import { onRequestGet } from "../vendor/onnxruntime/[file]";
+import { onRequestGet, onRequestHead } from "../vendor/onnxruntime/[file]";
 
 const SCRIPT = join(import.meta.dir, "..", "..", "scripts", "cf-wasm-partes.mjs");
 const URL_BASE = "https://supervision-e14.pages.dev";
@@ -62,6 +62,13 @@ function stubFetch() {
 
 async function pedir(clave: string, headers?: Headers) {
   return onRequestGet({
+    params: { file: clave },
+    request: { url: `${URL_BASE}/vendor/onnxruntime/${encodeURIComponent(clave)}`, headers },
+  });
+}
+
+async function pedirHead(clave: string, headers?: Headers) {
+  return onRequestHead({
     params: { file: clave },
     request: { url: `${URL_BASE}/vendor/onnxruntime/${encodeURIComponent(clave)}`, headers },
   });
@@ -165,5 +172,34 @@ describe("Pages Function /vendor/onnxruntime/[file]: reensambla lo que partió e
     const r = await pedir(NOM);
     expect(r.status).toBe(500);
     expect(await r.text()).toContain("NO HAY MANIFIESTO");
+  });
+
+  it("HEAD devuelve las cabeceras del asset sin pedir ninguna parte", async () => {
+    const r = await pedirHead(NOM);
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toBe("application/wasm");
+    expect(Number(r.headers.get("content-length"))).toBe(original.byteLength);
+    expect(r.headers.get("cache-control")).toBe("public, max-age=0, must-revalidate");
+    const manifiesto = JSON.parse(
+      readFileSync(join(raiz, "out", "e14", "wasm-partes.json"), "utf8"),
+    ) as Manifiesto;
+    expect(r.headers.get("etag")).toBe(`"${manifiesto.assets[NOM].sha256}"`);
+    expect(await r.text()).toBe("");
+    // Solo se consulta el manifiesto: HEAD no descarga 27 MiB para decir el tamaño.
+    expect(urls.some((u) => u.includes(".parte"))).toBe(false);
+  });
+
+  it("HEAD 304 con el ETag vigente y 404 sin cuerpo", async () => {
+    const manifiesto = JSON.parse(
+      readFileSync(join(raiz, "out", "e14", "wasm-partes.json"), "utf8"),
+    ) as Manifiesto;
+    const r304 = await pedirHead(NOM, new Headers({ "if-none-match": `"${manifiesto.assets[NOM].sha256}"` }));
+    expect(r304.status).toBe(304);
+    expect(await r304.text()).toBe("");
+
+    const r404 = await pedirHead("no-partido.wasm");
+    expect(r404.status).toBe(404);
+    expect(r404.headers.get("cache-control")).toBe("no-store");
+    expect(await r404.text()).toBe("");
   });
 });

@@ -89,7 +89,14 @@ const CABECERAS_WASM: Record<string, string> = {
   "cross-origin-resource-policy": "same-origin",
 };
 
-export const onRequestGet = async (context: ContextoFuncion): Promise<Response> => {
+interface EntradaResuelta {
+  clave: string;
+  entrada: EntradaManifiesto;
+}
+
+/** Manifiesto y entrada validados; un Response ya armado si la clave no sirve.
+ *  Lo comparten GET (streamea el cuerpo) y HEAD (solo cabeceras). */
+const resolverEntrada = async (context: ContextoFuncion): Promise<EntradaResuelta | Response> => {
   const clave = String(context.params.file ?? "");
   if (!CLAVE_VALIDA.test(clave) || clave.includes("..")) {
     return new Response("CLAVE INVÁLIDA", { status: 400, headers: CABECERAS_FALLO });
@@ -111,6 +118,14 @@ export const onRequestGet = async (context: ContextoFuncion): Promise<Response> 
     // de Pages cacheado por un año que haría el fallo eterno y silencioso.
     return new Response(`${clave} NO ESTÁ EN EL MANIFIESTO DE PARTES`, { status: 404, headers: CABECERAS_FALLO });
   }
+  return { clave, entrada };
+};
+
+export const onRequestGet = async (context: ContextoFuncion): Promise<Response> => {
+  const resuelto = await resolverEntrada(context);
+  if (resuelto instanceof Response) return resuelto;
+  const { clave, entrada } = resuelto;
+  const origen = new URL("/", context.request.url);
 
   const etag = `"${entrada.sha256}"`;
   const inm = context.request.headers?.get("if-none-match") ?? "";
@@ -199,6 +214,32 @@ export const onRequestGet = async (context: ContextoFuncion): Promise<Response> 
 
   const ext = clave.split(".").pop() ?? "";
   return new Response(cuerpo, {
+    headers: {
+      "content-type": TIPOS[ext] ?? "application/octet-stream",
+      "content-length": String(entrada.bytes),
+      ...CABECERAS_WASM,
+      etag,
+    },
+  });
+};
+
+/** HEAD sin streamear ni pedir las partes: mismas cabeceras que GET, cuerpo
+ *  nulo. Sirve a clientes que sondean tamaño/ETag sin descargar 27 MiB. */
+export const onRequestHead = async (context: ContextoFuncion): Promise<Response> => {
+  const resuelto = await resolverEntrada(context);
+  if (resuelto instanceof Response) {
+    return new Response(null, { status: resuelto.status, headers: resuelto.headers });
+  }
+  const { clave, entrada } = resuelto;
+
+  const etag = `"${entrada.sha256}"`;
+  const inm = context.request.headers?.get("if-none-match") ?? "";
+  if (inm.split(",").some((valor) => valor.trim() === etag)) {
+    return new Response(null, { status: 304, headers: { ...CABECERAS_WASM, etag } });
+  }
+
+  const ext = clave.split(".").pop() ?? "";
+  return new Response(null, {
     headers: {
       "content-type": TIPOS[ext] ?? "application/octet-stream",
       "content-length": String(entrada.bytes),
