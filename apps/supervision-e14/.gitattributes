@@ -1,0 +1,27 @@
+# Los activos vendidos por `public/` se sirven por su contenido EXACTO. Con
+# core.autocrlf=true (el default en Windows) git reescribe CRLF al checkout y
+# eso rompe dos cosas que ya mordieron: la alineación blank-first del dict del
+# rec PP-OCRv5 (test dict-v5, rojo SOLO en clones de Windows) y cualquier
+# .onnx/.wasm, que deja de ser un binario válido.
+public/models/** eol=lf
+public/vendor/** -text
+public/scanner/** eol=lf
+
+# Los binarios de `public/models/` NO llevan normalización de EOL: `eol=lf` los
+# corrompería (cualquier 0x0D 0x0A casual se convierte en 0x0A). Ya no se
+# versionan (scripts/preparar-assets.mjs), pero si alguien los agrega con -f la
+# regla tiene que ser explícita.
+public/models/**/*.onnx binary
+public/models/**/*.traineddata.gz binary
+
+# El sidecar nativo: python y sus requirements se checkean tal cual.
+native/**.py eol=lf
+native/**.txt eol=lf
+native/**.md eol=lf
+
+# Paquete del motor (mapa v2.3): el vendor y los artefactos viajan byte a
+# byte (mismo criterio que public/); el resto del paquete se normaliza a LF
+# como en el repo origen.
+packages/scanner-core/** eol=lf
+packages/scanner-core/src/qr/vendor/** -text
+packages/scanner-core/assets/** -text

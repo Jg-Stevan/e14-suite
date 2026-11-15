@@ -1,0 +1,78 @@
+# Dependencias y build
+node_modules
+.next
+out
+/out-raiz/
+dist
+build
+.wrangler
+.vercel
+coverage
+*.tsbuildinfo
+next-env.d.ts
+
+# Generados por `bun run preparar` (scripts/build-capa0-worker.mjs,
+# scripts/sincronizar-vendor.mjs y scripts/preparar-assets.mjs). NO se
+# versionan: el worker emite desde su .ts en cada build, el vendor es copia de
+# los paquetes que ya baja `bun install` y los modelos/OpenCV se descargan
+# verificados por SHA-256 (scripts/assets.lock.json). Los workflows corren
+# `bun run build` (hook `prebuild`) y un step explícito antes de los tests.
+public/scanner/capa0-qr.worker.js
+public/vendor/onnxruntime/
+public/vendor/tesseract/
+public/vendor/opencv-4.5.5-core.js
+public/wasm/zxing_reader.wasm
+public/wasm/zbar.wasm
+public/models/tesseract/*.traineddata.gz
+public/models/tesseract/**
+public/models/rapidocr/*.onnx
+
+# Sidecar nativo: se versiona el código (native/*.py), no lo que produce
+native/__pycache__/
+native/calentamiento/
+native/out*/
+native/final*/
+native/montage_*.png
+native/antes_*.png
+native/*.json
+/dist/
+/.venv-sidecar/
+*.spec
+
+# Evidencia de corridas locales: scripts/bench-navegador.mjs escribe
+# bench-navegador-<tag>.json con los tiempos crudos y el texto OCR de las actas
+# del mantenedor. Es dato de sesión (y contiene nombres leídos de actas reales):
+# nunca al repo.
+/bench-navegador-*.json
+/out/fotos*/
+
+# Logs y estado local del entorno de desarrollo
+*.log
+*.pid
+.env*
+.DS_Store
+*.pem
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Herramientas de agentes / skills locales
+/skills/
+.z-ai-config
+.claude
+local-*
+
+# SEC-10/D86 — jamás versionar actas reales ni capturas con datos de jurados
+docs/capturas-actas-reales*/
+docs/capturas-divipola*/
+actas-reales/
+*.acta-e14-real.jpg
+
+# Hub local de E2E (scripts/hub-local.mjs): actas REALES recibidas del
+# celular + certificados self-signed. Dato de sesión, jamás al repo.
+/.hub-local/
+# Certificado TLS del hub local — vive FUERA del almacén (C-02): el reset
+# del hub borra actas, nunca el certificado (los celulares no re-aceptan
+# el aviso de privacidad tras un reset).
+/.hub-local-cert/
