@@ -344,7 +344,13 @@ def otro_sidecar(puerto: int) -> dict | None:
     de 52,0 s a 58,0 s con dos sidecars vivos. Se detecta ANTES de cargar los
     modelos para que el segundo arranque falle en menos de un segundo."""
     try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{puerto}/salud", timeout=1.0) as r:
+        # C-22 rechaza orígenes vacíos: sin esta cabecera el propio sondeo local
+        # recibe 403 y un segundo arranque no detecta al primero.
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{puerto}/salud",
+            headers={"Origin": f"http://127.0.0.1:{puerto}"},
+        )
+        with urllib.request.urlopen(req, timeout=1.0) as r:
             j = json.loads(r.read().decode("utf-8"))
         return j if j.get("ok") else None
     except Exception:

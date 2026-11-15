@@ -270,7 +270,11 @@ let salud = null;
 while (Date.now() - t0 < 120_000 && !salud) {
   if (hijo.exitCode !== null) break;
   try {
-    const p = await fetch(`http://127.0.0.1:${PUERTO_PRUEBA}/salud`, { signal: AbortSignal.timeout(1500) });
+    const p = await fetch(`http://127.0.0.1:${PUERTO_PRUEBA}/salud`, {
+      signal: AbortSignal.timeout(1500),
+      // C-22 rechaza peticiones sin Origin; el lazo de 127.0.0.1 está permitido.
+      headers: { Origin: `http://127.0.0.1:${PUERTO_PRUEBA}` },
+    });
     salud = await p.json();
   } catch {
     await new Promise((s) => setTimeout(s, 700));
