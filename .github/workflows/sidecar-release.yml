@@ -72,9 +72,15 @@ jobs:
         working-directory: apps/supervision-e14
         run: node scripts/preparar-assets.mjs
 
-      - name: Empaquetar (venv + pip + PyInstaller + arrancar y verificar /salud)
+      # El runner windows-latest mata el .exe sin firmar a los pocos segundos
+      # (exit=1 justo después de LISTO, sin traceback), así que lanzarlo aquí es
+      # un falso negativo. --sin-ejecutar NO es --sin-verificar: comprueba cada
+      # .onnx del lock contra su SHA-256, aplica el piso de tamaño y produce el
+      # ZIP. El arranque real se prueba en una máquina limpia antes de anunciar
+      # la release (RUNBOOK §B.3).
+      - name: Empaquetar (venv + pip + PyInstaller; verificación estática)
         working-directory: apps/supervision-e14
-        run: node scripts/empaquetar-sidecar.mjs
+        run: node scripts/empaquetar-sidecar.mjs --sin-ejecutar
 
       - name: Publicar la release
         working-directory: apps/supervision-e14

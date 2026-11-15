@@ -52,8 +52,9 @@
  * `_MEIPASS`, que arranque YA es la prueba de que el `--add-data` aterrizó.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { tmpdir, homedir } from "node:os";
 
 const argv = Object.fromEntries(
@@ -75,6 +76,13 @@ if (FORMATO !== "onefile" && FORMATO !== "onedir") {
   console.error(`[empaquetar] --formato debe ser onefile|onedir (llegó ${FORMATO})`);
   process.exit(2);
 }
+// `--sin-ejecutar` NO es `--sin-verificar`: sigue comprobando el bundle (los
+// .onnx con el SHA-256 del lock y el piso de tamaño) y produce el ZIP, pero no
+// lanza el .exe. Lo usa el runner de windows-latest, donde Defender mata el
+// binario sin firmar a los pocos segundos (exit=1 sin traceback) y convierte
+// una verificación real en un falso negativo. El arranque en máquina limpia
+// sigue siendo el gate manual del runbook.
+const SIN_EJECUTAR = Boolean(argv["sin-ejecutar"]);
 const EXE = join(
   RAIZ,
   "dist",
@@ -215,11 +223,41 @@ if (argv["sin-verificar"] || DRY) {
   process.exit(0);
 }
 
-paso("verificar arrancando el .exe");
+let salud = null;
+let msArranque = null;
+
+if (SIN_EJECUTAR) {
+  paso("verificar bundle sin ejecutar (modelos + SHA-256)");
+  const lock = JSON.parse(readFileSync(join(RAIZ, "scripts", "assets.lock.json"), "utf-8"));
+  const modelos = lock.archivos.filter(
+    (a) => a.destino.includes("/rapidocr/") && a.destino.endsWith(".onnx"),
+  );
+  if (modelos.length === 0) {
+    console.error("[empaquetar] ✘ el lock no declara modelos rapidocr .onnx");
+    process.exit(1);
+  }
+  const dirModelos = join(dirname(EXE), "_internal", "models", "rapidocr");
+  for (const asset of modelos) {
+    const ruta = join(dirModelos, basename(asset.destino));
+    if (!existsSync(ruta)) {
+      console.error(`[empaquetar] ✘ falta ${ruta} (¿--add-data perdido?)`);
+      process.exit(1);
+    }
+    const sha = createHash("sha256").update(readFileSync(ruta)).digest("hex");
+    if (sha !== asset.sha256) {
+      console.error(
+        `[empaquetar] ✘ ${basename(asset.destino)}: SHA-256 ${sha} ≠ ${asset.sha256}`,
+      );
+      process.exit(1);
+    }
+  }
+  log(`bundle OK · ${modelos.length} modelos .onnx con el SHA-256 del lock · ejecución saltada`);
+} else {
 // Con `cwd` en un temporal FUERA del repo: el congelado no puede ver
 // `public/models`, así que si `/salud` contesta fue con los modelos del bundle.
 // `--sesiones 2` es el default que va a ver el visitante; medir con 1 sería
 // mentir en el número de arranque.
+paso("verificar arrancando el .exe");
 const cwdPrueba = join(tmpdir(), "e14-sidecar-prueba");
 mkdirSync(cwdPrueba, { recursive: true });
 const hijo = spawn(EXE, ["--puerto", String(PUERTO_PRUEBA), "--sesiones", "2"], { cwd: cwdPrueba, stdio: ["ignore", "pipe", "pipe"] });
@@ -238,7 +276,7 @@ while (Date.now() - t0 < 120_000 && !salud) {
     await new Promise((s) => setTimeout(s, 700));
   }
 }
-const msArranque = Date.now() - t0;
+msArranque = Date.now() - t0;
 
 // taskkill /T, no `hijo.kill()`: en onefile el bootloader FORKA un hijo que
 // hereda el stdout — matar solo el padre deja un sidecar huérfano escuchando y
@@ -287,6 +325,7 @@ if (msArranque > 12_000) {
       `--onefile serían 16,7-18,1 s SIEMPRE.`,
   );
 }
+}
 
 paso("comprimir para distribuir");
 // Se distribuye la CARPETA en ZIP, no el .exe de un archivo: medidos back-to-
@@ -314,8 +353,12 @@ if (ES_WINDOWS && FORMATO === "onedir") {
   log(`${ZIP} · ${(statSync(ZIP).size / 1048576).toFixed(1)} MiB`);
 }
 
+const arranque =
+  msArranque === null
+    ? "verificación de ejecución saltada (bundle verificado)"
+    : `${msArranque} ms a /salud · motor ${salud.motor} · ${salud.version}`;
 log(
   `OK · ${NOMBRE} · ${FORMATO} · ${mib.toFixed(1)} MiB en disco` +
     `${existsSync(ZIP) ? ` · ${(statSync(ZIP).size / 1048576).toFixed(1)} MiB de descarga` : ""} · ` +
-    `${msArranque} ms a /salud · motor ${salud.motor} · ${salud.version}`,
+    arranque,
 );
