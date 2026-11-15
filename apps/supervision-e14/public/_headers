@@ -68,5 +68,8 @@
 /scanner/*
   Cache-Control: public, max-age=31536000, immutable
 
+# El manifiesto de partes es DATO del deployment actual: con 24 h de frescura
+# un deploy nuevo podía servir un manifiesto viejo y pedir partes que ya no
+# existen. 0 s + revalidación lo ata siempre al último build.
 /e14/*
-  Cache-Control: public, max-age=86400, must-revalidate
+  Cache-Control: public, max-age=0, must-revalidate

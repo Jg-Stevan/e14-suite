@@ -1,5 +1,5 @@
 # KIT e14-pages-wasm-partes-v1 — configuración del proyecto Cloudflare Pages que
-# despliega .github/workflows/cloudflare-pages.yml (ver D80, que sustituye a D77).
+# despliega .github/workflows/deploy-panel.yml (ver D80, que sustituye a D77).
 #
 # Qué queda aquí y por qué: solo las dos claves que `wrangler pages deploy` no
 # puede pasar por bandera. En D77 este archivo además declaraba `[[r2_buckets]]`

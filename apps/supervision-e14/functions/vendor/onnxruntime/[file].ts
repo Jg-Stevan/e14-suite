@@ -60,7 +60,10 @@ interface Manifiesto {
 
 interface ContextoFuncion {
   params: Record<string, string | string[]>;
-  request: { url: string };
+  request: {
+    url: string;
+    headers?: { get(nombre: string): string | null };
+  };
 }
 
 const CLAVE_VALIDA = /^[A-Za-z0-9._-]+$/;
@@ -77,6 +80,14 @@ const TIPOS: Record<string, string> = {
 /** Todo lo que es fallo o dato volátil: sin esto, un 404 de Function quedaría
  *  cacheado por el navegador y el fallo se volvería eterno hasta otra URL. */
 const CABECERAS_FALLO: Record<string, string> = { "cache-control": "no-store" };
+
+/** El wasm NO lleva versión en la URL. Un `immutable` de un año dejaría al
+ *  navegador con el build viejo tras un upgrade de ORT; con revalidación el
+ *  ETag (sha256 del build) devuelve 304 mientras el contenido no cambie. */
+const CABECERAS_WASM: Record<string, string> = {
+  "cache-control": "public, max-age=0, must-revalidate",
+  "cross-origin-resource-policy": "same-origin",
+};
 
 export const onRequestGet = async (context: ContextoFuncion): Promise<Response> => {
   const clave = String(context.params.file ?? "");
@@ -101,11 +112,22 @@ export const onRequestGet = async (context: ContextoFuncion): Promise<Response> 
     return new Response(`${clave} NO ESTÁ EN EL MANIFIESTO DE PARTES`, { status: 404, headers: CABECERAS_FALLO });
   }
 
+  const etag = `"${entrada.sha256}"`;
+  const inm = context.request.headers?.get("if-none-match") ?? "";
+  if (inm.split(",").some((valor) => valor.trim() === etag)) {
+    return new Response(null, { status: 304, headers: { ...CABECERAS_WASM, etag } });
+  }
+
   // En paralelo: son N subrequests del mismo deployment y esperarlos de uno en
   // uno solo alarga el wall-clock de la invocación (el límite es 50 subrequests
-  // y usamos 1 + N).
+  // y usamos 1 + N). El `?v=` es el sha256 del build: las partes también se
+  // sirven con caché larga y sin él un deploy nuevo podría leer partes viejas
+  // del edge/browser (misma URL, contenido distinto).
+  const version = encodeURIComponent(entrada.sha256);
   const respuestas: Response[] = await Promise.all(
-    Array.from({ length: entrada.partes }, (_, n) => fetch(new URL(`${PREFIJO_WASM}${clave}.parte${n}`, origen))),
+    Array.from({ length: entrada.partes }, (_, n) =>
+      fetch(new URL(`${PREFIJO_WASM}${clave}.parte${n}?v=${version}`, origen)),
+    ),
   );
   const mala = respuestas.findIndex((r) => !r.ok || !r.body);
   if (mala !== -1) {
@@ -180,9 +202,8 @@ export const onRequestGet = async (context: ContextoFuncion): Promise<Response> 
     headers: {
       "content-type": TIPOS[ext] ?? "application/octet-stream",
       "content-length": String(entrada.bytes),
-      "cache-control": "public, max-age=31536000, immutable",
-      "cross-origin-resource-policy": "same-origin",
-      "etag": `"${entrada.sha256}"`,
+      ...CABECERAS_WASM,
+      etag,
     },
   });
 };

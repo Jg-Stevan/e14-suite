@@ -1,0 +1,51 @@
+# Deploy móvil — Cloudflare Pages (export estático en la raíz)
+#
+# Canal Pages de digielect14. El canal Worker (opennextjs) sigue en
+# deploy-movil.yml. Este workflow usa un `--cwd` temporal a propósito:
+# apps/digielect14/wrangler.jsonc describe el Worker de OpenNext y
+# `wrangler pages deploy` no debe leerlo.
+#
+# Requiere los secrets CLOUDFLARE_API_TOKEN y CLOUDFLARE_ACCOUNT_ID.
+name: deploy — movil (Cloudflare Pages)
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-movil-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: instalar workspaces (lockfile de la raíz)
+        run: bun install --frozen-lockfile
+
+      - name: build (export estático)
+        working-directory: apps/digielect14
+        env:
+          BUILD_STATIC: "1"
+          NEXT_PUBLIC_BASE_PATH: ""
+        run: bun run build
+
+      - name: deploy (Cloudflare Pages)
+        working-directory: apps/digielect14
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          directorio="$(mktemp -d)"
+          bunx wrangler pages deploy "$GITHUB_WORKSPACE/apps/digielect14/out" \
+            --project-name digielect14 --branch main --cwd "$directorio"

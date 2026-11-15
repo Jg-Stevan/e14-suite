@@ -39,6 +39,7 @@ type Manifiesto = { version: number; assets: Record<string, { partes: number; by
 let raiz = "";
 let rutaWasm = "";
 let original: Buffer;
+let urls: string[] = [];
 const fetchReal = globalThis.fetch;
 
 /** El `fetch` de la Function resuelve rutas absolutas contra el deployment;
@@ -46,6 +47,7 @@ const fetchReal = globalThis.fetch;
 function stubFetch() {
   globalThis.fetch = (async (entrada: string | URL) => {
     const url = typeof entrada === "string" ? new URL(entrada) : entrada instanceof URL ? entrada : new URL(String(entrada));
+    urls.push(url.toString());
     const rutaDisco = join(raiz, "out", url.pathname.replace(/^\//, "").split("/").join("/"));
     if (!existsSync(rutaDisco)) return new Response("NO ESTÁ EN EL DEPLOYMENT", { status: 404 });
     const cuerpo = readFileSync(rutaDisco);
@@ -58,10 +60,10 @@ function stubFetch() {
   }) as unknown as typeof fetch;
 }
 
-async function pedir(clave: string) {
+async function pedir(clave: string, headers?: Headers) {
   return onRequestGet({
     params: { file: clave },
-    request: { url: `${URL_BASE}/vendor/onnxruntime/${encodeURIComponent(clave)}` },
+    request: { url: `${URL_BASE}/vendor/onnxruntime/${encodeURIComponent(clave)}`, headers },
   });
 }
 
@@ -73,6 +75,7 @@ beforeEach(async () => {
   writeFileSync(join(rutaWasm, NOM), original);
   const p = Bun.spawn(["bun", SCRIPT, "--umbral=0.002", "--tamano-max=0.001"], { cwd: raiz });
   await p.exited;
+  urls = [];
   stubFetch();
 });
 
@@ -93,7 +96,9 @@ describe("Pages Function /vendor/onnxruntime/[file]: reensambla lo que partió e
   it("trae las cabeceras que ORT y el caché necesitan", async () => {
     const r = await pedir(NOM);
     expect(r.headers.get("content-type")).toBe("application/wasm");
-    expect(r.headers.get("cache-control")).toContain("immutable");
+    // La URL del wasm no lleva versión: immutable un año dejaría cacheado el
+    // build viejo tras un upgrade de ORT. La revalidación con ETag lo evita.
+    expect(r.headers.get("cache-control")).toBe("public, max-age=0, must-revalidate");
     expect(r.headers.get("cross-origin-resource-policy")).toBe("same-origin");
     // El ETag sale del sha256 del manifiesto: es fuerte y estable por contenido.
     const manifiesto = JSON.parse(
@@ -102,6 +107,25 @@ describe("Pages Function /vendor/onnxruntime/[file]: reensambla lo que partió e
     expect(r.headers.get("etag")).toBe(`"${manifiesto.assets[NOM].sha256}"`);
     const declarado = r.headers.get("content-length");
     if (declarado) expect(Number(declarado)).toBe(original.byteLength);
+  });
+
+  it("304 si el navegador manda el ETag vigente (revalidación barata)", async () => {
+    const manifiesto = JSON.parse(
+      readFileSync(join(raiz, "out", "e14", "wasm-partes.json"), "utf8"),
+    ) as Manifiesto;
+    const r = await pedir(NOM, new Headers({ "if-none-match": `"${manifiesto.assets[NOM].sha256}"` }));
+    expect(r.status).toBe(304);
+    expect(r.headers.get("etag")).toBe(`"${manifiesto.assets[NOM].sha256}"`);
+    expect(await r.text()).toBe("");
+  });
+
+  it("pide cada parte con ?v=sha256 (un deploy nuevo no lee partes viejas de caché)", async () => {
+    await pedir(NOM);
+    const manifiesto = JSON.parse(
+      readFileSync(join(raiz, "out", "e14", "wasm-partes.json"), "utf8"),
+    ) as Manifiesto;
+    const version = manifiesto.assets[NOM].sha256;
+    expect(urls.some((u) => u.includes(`/vendor/onnxruntime/${NOM}.parte0?v=${version}`))).toBe(true);
   });
 
   it("404 con no-store para un asset que no está en el manifiesto", async () => {

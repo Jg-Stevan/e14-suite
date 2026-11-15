@@ -1,9 +1,11 @@
-# Deploy panel — GitHub Pages (export estático)
-# NOTA IMPORTANTE: el panel actual publica además una Pages Function de wasm
-# partidos. El artefacto que se sube aquí debe incluir esa Function igual que
-# hoy (directorio functions/ o _worker.js según tu config actual). Revisa el
-# pipeline del repo viejo antes del primer push.
-name: deploy — supervision (GitHub Pages)
+# Deploy panel — Cloudflare Pages (export estático + Pages Function de wasm partido)
+#
+# GitHub Pages quedó retirado. El panel se publica con `wrangler pages deploy`
+# desde apps/supervision-e14: wrangler toma `pages_build_output_dir` de
+# wrangler.toml y compila la Function de functions/vendor/onnxruntime.
+#
+# Requiere los secrets CLOUDFLARE_API_TOKEN y CLOUDFLARE_ACCOUNT_ID.
+name: deploy — supervision (Cloudflare Pages)
 
 on:
   workflow_dispatch:
@@ -12,15 +14,13 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: deploy-panel
   cancel-in-progress: false
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,24 +34,18 @@ jobs:
 
       - name: build (export estático)
         working-directory: apps/supervision-e14
+        env:
+          BUILD_STATIC: "1"
+          NEXT_PUBLIC_BASE_PATH: ""
         run: bun run build
 
-      - name: configurar Pages
-        uses: actions/configure-pages@v5
+      - name: partir wasm > 25 MiB y escribir _routes.json
+        working-directory: apps/supervision-e14
+        run: bun scripts/cf-wasm-partes.mjs
 
-      # Ajusta 'path' si tu export + Function viven en otro directorio de salida
-      - name: subir artefacto
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: apps/supervision-e14/out
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: publicar
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: deploy (Cloudflare Pages)
+        working-directory: apps/supervision-e14
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: bunx wrangler pages deploy --project-name supervision-e14 --branch main
