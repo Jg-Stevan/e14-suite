@@ -7,8 +7,9 @@
     "packages/*"
   ],
   "engines": {
-    "bun": ">=1.1.0"
+    "bun": "1.4.2"
   },
+  "packageManager": "bun@1.4.2",
   "scripts": {
     "dev:movil": "cd apps/digielect14 && bun run dev",
     "dev:panel": "cd apps/supervision-e14 && bun run dev",

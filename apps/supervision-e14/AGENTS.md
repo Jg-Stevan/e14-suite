@@ -1,7 +1,7 @@
 # AGENTS.md — supervision-e14
 
 ## Stack y comandos (verificados contra package.json)
-- Next.js + TypeScript. Gestor de dependencias: **bun** (`packageManager: bun@1.3.14`). No uses npm ni pnpm.
+- Next.js + TypeScript. Gestor de dependencias: **bun**, fijado en 1.4.2 (raíz del monorepo: `engines` + `packageManager` del `package.json` raíz — R-03, auditoría 2026-11-16). No uses npm ni pnpm.
 - `bun run dev` — servidor en el puerto 3000 (ejecuta `preparar` antes).
 - `bun run preparar` — materializa lo que no se versiona: worker de QR, vendor copiado de `node_modules` y assets externos verificados por SHA-256 (`scripts/assets.lock.json`). Un clon limpio lo necesita antes de `bun test`.
 - `bun run verificar` — preparar + typecheck + lint + test. **Es la puerta de salida**: nada se declara terminado sin este comando en verde, y se reporta su salida real.
