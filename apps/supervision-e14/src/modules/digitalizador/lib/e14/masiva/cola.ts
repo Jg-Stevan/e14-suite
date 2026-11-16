@@ -7,6 +7,7 @@
  * Errores de IDB NUNCA tumban la UI (kit §3): el caller decide — la entrada
  * afectada pasa a ERROR con motivo corto / la vista pinta su píldora.
  */
+import { logger } from "../../logger";
 import type { Acta } from "../types";
 import type { RegistroMasiva } from "./tipos";
 
@@ -227,7 +228,9 @@ function compactarSync(
   // (el thumb sigue siendo dataURL — desviación M-e68-2 documentada: su
   // migración ahorra ~13 KB/acta, no justifica tocar la bandeja).
   if (compacto.fotoOriginalBlob || compacto.fotoProcesadaBlob || fotoOriginal || fotoProcesada) {
-    console.info("[e14] memoria fila", {
+    // H-38 (R-10): al logger central (debug) — era console.info residual en
+    // producción; el formato del mensaje no cambia en desarrollo.
+    logger.debug("[e14] memoria fila", {
       registroId: registro.id,
       estado: registro.estado,
       statusActa: acta.status,
@@ -398,7 +401,9 @@ export async function recuperarCola(excluir?: ReadonlySet<string>): Promise<void
     recuperados++;
   }
   if (recuperados > 0) {
-    console.info("[e14] masiva recuperarCola", {
+    // H-38 (R-10): al logger central (debug) — era console.info residual en
+    // producción; el formato del mensaje no cambia en desarrollo.
+    logger.debug("[e14] masiva recuperarCola", {
       zombis: zombis.length,
       recuperados,
       vivosRespetados: zombis.length - recuperados,

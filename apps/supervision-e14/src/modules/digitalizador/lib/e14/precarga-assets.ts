@@ -1,5 +1,7 @@
 "use client";
 
+import { logger } from "../logger";
+
 /**
  * P-23 (plan 2026-11-12) — PRECARGA de los assets OCR descargables, indexada
  * por `scripts/assets.lock.json` (payload ~38,7 MB — el lockfile pesa ~3 KB).
@@ -97,7 +99,9 @@ export function programarPrecargaAssetsOcr(sincronizarSoloWifi: boolean): void {
       if (!puedeDescargarAhora(sincronizarSoloWifi, enLinea, redTipo, redWifi)) {
         intentos++;
         if (intentos > TECHO_INTENTOS_PRECARGA) {
-          console.info(
+          // H-38 (R-10): al logger central — era console.info residual en
+          // producción; el formato del mensaje no cambia en desarrollo.
+          logger.info(
             `[e14] precarga P-23 — desistida tras ${TECHO_INTENTOS_PRECARGA} intentos (red débil/offline; soloWifi=${sincronizarSoloWifi})`,
           );
           limpiar();
@@ -110,7 +114,9 @@ export function programarPrecargaAssetsOcr(sincronizarSoloWifi: boolean): void {
       for (const ruta of RUTAS_PRECARGA_OCR) {
         if (await precargarRuta(ruta)) ok++;
       }
-      console.info(
+      // H-38 (R-10): al logger central — era console.info residual en
+      // producción; el formato del mensaje no cambia en desarrollo.
+      logger.info(
         `[e14] precarga P-23 — assets OCR en caché: ${ok}/${RUTAS_PRECARGA_OCR.length} (soloWifi=${sincronizarSoloWifi})`,
       );
     };

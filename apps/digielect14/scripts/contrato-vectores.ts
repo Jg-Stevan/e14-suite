@@ -62,7 +62,7 @@ interface DescriptorContrato {
   ocr: string;
 }
 
-export const DESCRYPTORES: DescriptorContrato[] = [
+export const DESCRIPTORES: DescriptorContrato[] = [
   {
     id: "cairo-auto",
     nota: "Ruta completa legible + kit del consenso → AUTO (el caso feliz, igual en el móvil y en el lote); el pie «SUMA TOTAL» visto ⇒ no RECORTADA",

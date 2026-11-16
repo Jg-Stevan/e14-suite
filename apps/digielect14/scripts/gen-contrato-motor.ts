@@ -31,7 +31,7 @@ import {
 } from "@jg-stevan/scanner-core/dominio/clasificador";
 import type { DivipolBase } from "@jg-stevan/scanner-core/dominio/divipol";
 import { statusDeScore } from "@jg-stevan/scanner-core/dominio/types";
-import { DESCRYPTORES } from "./contrato-vectores";
+import { DESCRIPTORES } from "./contrato-vectores";
 
 // D-3 (R-02, auditoría 2026-11-16): la ruta vieja
 // (`../src/lib/e14/__fixtures__/contrato-motor.json`) murió con la
@@ -62,7 +62,7 @@ function canon(v: unknown): unknown {
   return v;
 }
 
-const descriptores = DESCRYPTORES.map((d) => {
+const descriptores = DESCRIPTORES.map((d) => {
   const c = clasificarCabecera(d.ocr, base);
   return {
     id: d.id,

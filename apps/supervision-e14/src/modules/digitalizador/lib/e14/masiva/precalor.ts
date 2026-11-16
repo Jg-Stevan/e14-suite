@@ -55,7 +55,11 @@ const precalorColaEfectivo = (): number => planGamaActual().precalorCola;
 
 /** Entrada del mapa de masters (SOLO memoria — jamás IDB). */
 interface EntradaPrecalor {
-  maestro: MaestroImagen;
+  /** H-37 (R-10): `null` SOLO mientras el precalor está en vuelo — la
+   *  entrada entra al mapa YA decodificada (ver precalentarUno). Antes el
+   *  caso nulo se modelaba con un cast que mentía al compilador
+   *  (`null as unknown as MaestroImagen`). */
+  maestro: MaestroImagen | null;
   /** ms TOTALES del precalor para esta fila (IDB+decode+encode — T4). */
   precalorMs: number;
   /** Señal de cancelación (T3.4) — la fila murió mientras se precalentaba. */
@@ -184,7 +188,7 @@ async function precalentarUno(
   opciones: { ignorarOciosidad: boolean },
 ): Promise<boolean> {
   const t0 = Date.now();
-  const entrada: EntradaPrecalor = { maestro: null as unknown as MaestroImagen, precalorMs: 0, abortada: false };
+  const entrada: EntradaPrecalor = { maestro: null, precalorMs: 0, abortada: false };
   try {
     const registro = await leerRegistro(id);
     const archivo = registro.archivo;
@@ -249,6 +253,9 @@ export function consumirMaestro(
   const entrada = entradas.get(id);
   if (!entrada) return null;
   entradas.delete(id);
+  // H-37 (R-10): la entrada entra al mapa YA decodificada; el guard cubre
+  // el caso imposible de una entrada sin master — tipo honesto, sin cast.
+  if (!entrada.maestro) return null;
   return { maestro: entrada.maestro, precalorMs: entrada.precalorMs };
 }
 
