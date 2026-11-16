@@ -4,10 +4,19 @@ Monorepo del ecosistema E-14: **digitalización de actas de escrutinio, procesad
 
 ## Demos en vivo (Cloudflare Pages)
 
-| App | URL |
-| --- | --- |
-| digielect14 — PWA móvil, captura e importación de actas | https://digielect14.pages.dev/ |
-| supervision-e14 — panel de supervisión y carga masiva | https://supervision-e14.pages.dev/#dia=DOMINGO&vista=carga-masiva |
+| App | URL canónico | Se despliega con |
+| --- | --- | --- |
+| digielect14 — PWA móvil, captura e importación de actas | https://digielect14.pages.dev/ | push a `main` · `deploy-movil-pages.yml` |
+| supervision-e14 — panel de supervisión y carga masiva | https://supervision-e14.pages.dev/ | push a `main` · `deploy-panel.yml` |
+
+Ruta de ejemplo del panel (carga masiva): https://supervision-e14.pages.dev/#dia=DOMINGO&vista=carga-masiva
+
+Ambos deploys corren automáticamente en cada push a `main` (y en tags `v*`) y
+quedaron verdes el 2026-11-16 sobre el commit de la remediación. Destinos
+equivalentes (mismo código, otros canales):
+
+- Worker móvil (deploy manual): https://digielect14e.julistevan02.workers.dev/
+- Hub de producción `e14-puente` (fuente fuera de este monorepo; salud): https://e14-puente.julistevan02.workers.dev/salud
 
 ## Qué hay aquí
 
