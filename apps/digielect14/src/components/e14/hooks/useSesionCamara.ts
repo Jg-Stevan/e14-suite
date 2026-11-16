@@ -242,7 +242,7 @@ interface CameraProbeResult {
 /** Modos de foco que cuentan como autofocus REAL (regla D3 de codigo-test). */
 const REAL_AF_MODES = new Set(["continuous", "single-shot"]);
 
-function hasRealAF(modes: string[]): boolean {
+function tieneRealAF(modes: string[]): boolean {
   return modes.some((m) => REAL_AF_MODES.has(m.toLowerCase()));
 }
 
@@ -379,7 +379,7 @@ function chooseMainProbe(probes: CameraProbeResult[]): CameraProbeResult | null 
     backs.length > 0 ? backs : noFrontales.length > 0 ? noFrontales : probes;
   const byRes = (a: CameraProbeResult, b: CameraProbeResult): number =>
     b.maxWidth * b.maxHeight - a.maxWidth * a.maxHeight;
-  const withAf = pool.filter((p) => hasRealAF(p.focusModes));
+  const withAf = pool.filter((p) => tieneRealAF(p.focusModes));
   if (withAf.length > 0) {
     return [...withAf].sort(
       (a, b) => byRes(a, b) || (a.torch !== b.torch ? (a.torch ? -1 : 1) : 0)
