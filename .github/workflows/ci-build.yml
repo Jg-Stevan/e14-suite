@@ -1,0 +1,102 @@
+# CI de build real — e14-suite (R-35, auditoría 2026-11-16)
+#
+# El «compila» de las auditorías era `tsc --noEmit`: NADIE había ejecutado
+# nunca `next build` ni el export estático en CI — la puerta más básica de un
+# producto PWA no estaba verificada (sin análisis de bundle, tamaño,
+# tree-shaking ni warnings de build).
+#
+# Por app (paths-filter):
+#   · digielect14  → BUILD_STATIC=1 (export estático, el canal Pages)
+#   · supervision  → export estático (output: "export" de su next.config)
+#
+# El reporte de tamaño por app se publica como artefacto (du + los 20
+# archivos más grandes). Cada warning del build se trata como hallazgo de
+# DEUDA.md (DoD de R-35).
+#
+# NOTA: este workflow NO repite typecheck/lint/tests (eso vive en ci-movil /
+# ci-panel); su única señal es que el build de producción sale exit 0 y su
+# tamaño es observable.
+name: build — producción de ambas apps
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: next build (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: digielect14
+            # Export estático — mismo entorno que deploy-movil-pages.yml.
+            build_static: "1"
+          - app: supervision-e14
+            build_static: "1"
+    steps:
+      # Pines por SHA (R-13).
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.2"
+
+      - name: instalar workspaces (lockfile de la raíz)
+        run: bun install --frozen-lockfile
+
+      # Los binarios de public/ no se versionan: cache por hash del lock
+      # (el prebuild de cada app los materializa si el cache falla).
+      - name: Cache de assets externos
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            apps/${{ matrix.app }}/public/models/**
+            apps/${{ matrix.app }}/public/vendor/**
+          key: assets-build-${{ matrix.app }}-${{ runner.os }}-${{ hashFiles(format('apps/{0}/scripts/assets.lock.json', matrix.app)) }}
+
+      - name: build de producción (export estático)
+        working-directory: apps/${{ matrix.app }}
+        env:
+          # MISMO entorno que los workflows de deploy (BUILD_STATIC=1 exporta
+          # el estático de digielect14 en raíz; el panel ya exporta por su
+          # next.config — la variable le es inerte pero se replica por
+          # fidelidad al deploy).
+          BUILD_STATIC: ${{ matrix.build_static }}
+          NEXT_PUBLIC_BASE_PATH: ""
+        run: bun run build
+
+      # ── Reporte de tamaño de bundle (DoD: tamaño observable por app) ──────
+      - name: Reporte de tamaño del bundle
+        working-directory: apps/${{ matrix.app }}
+        run: |
+          mkdir -p /tmp/reporte
+          {
+            echo "# Bundle de ${{ matrix.app }} — $(git rev-parse --short HEAD)"
+            echo
+            echo "## Tamaño total de out/"
+            du -sh out || du -sh .next
+            echo
+            echo "## Los 20 archivos más grandes"
+            find out -type f -printf '%s\t%p\n' 2>/dev/null | sort -rn | head -20 \
+              | awk -F'\t' '{printf "%8.1f KB  %s\n", $1/1024, $2}'
+            echo
+            echo "## Peso por directorio de primer nivel"
+            du -sh out/* 2>/dev/null | sort -rh | head -15
+          } > /tmp/reporte/bundle-${{ matrix.app }}.md
+          cat /tmp/reporte/bundle-${{ matrix.app }}.md
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bundle-${{ matrix.app }}-${{ github.sha }}
+          path: /tmp/reporte/
+          retention-days: 14
