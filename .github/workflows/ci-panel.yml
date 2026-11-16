@@ -42,3 +42,11 @@ jobs:
       - name: verificar del panel
         working-directory: apps/supervision-e14
         run: bun run verificar
+
+      # R-37: primera MEDICIÓN de cobertura del panel (52,26 % statements
+      # medido 2026-11-16 — antes ni estaba declarada). bun reporta sin
+      # umbral duro: el reporte se publica como artefacto y el número es
+      # observable por SHA.
+      - name: Cobertura (bun test --coverage)
+        working-directory: apps/supervision-e14
+        run: bun test --coverage

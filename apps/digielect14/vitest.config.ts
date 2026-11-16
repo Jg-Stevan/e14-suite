@@ -28,14 +28,15 @@ export default defineConfig({
       reporter: ["text", "json-summary", "html"],
       include: ["src/**/*.ts", "src/**/*.tsx"],
       thresholds: {
-        // 2.3 (F4) — umbral INFORMATIVO: no rompe el gate mientras sube.
-        // NOTA honesta: el 33,28 % citado por la auditoría (fase 2, 5-nov,
-        // vitest de entonces) NO es reproducible con vitest@5 + coverage-v8@5
-        // (los contadores del proveedor cambiaron). El baseline REAL medido
-        // con ESTA toolchain durante la remediación es 17,08 % statements —
-        // de ahí parte el piso; la regla de la casa aplica desde aquí: cada
-        // ola que toque código sube el umbral o al menos no lo baja.
-        statements: 17,
+        // R-37 (auditoría 2026-11-16) — RATCHET medido: 19,86 % statements
+        // con ESTA toolchain (vitest 5 + coverage-v8 5, medido 2026-11-16
+        // sobre 404 pruebas): el piso sube de 17 a 19. La regla de la casa
+        // sigue — cada ola que toque código sube el umbral o al menos no lo
+        // baja. (El 33,28 % citado por una auditoría vieja jamás fue
+        // reproducible con esta toolchain; el 17,08 % era el baseline de la
+        // remediación.) En CI corre con --coverage (ci-movil.yml) y el
+        // reporte se publica como artefacto.
+        statements: 19,
       },
     },
   },

@@ -82,3 +82,15 @@ jobs:
           bun scripts/smoke-heartbeat-worker.mjs
           bun scripts/smoke-capa0-qr-worker.mjs
           bun scripts/smoke-fallback-canvas-worker.mjs
+
+      # R-37: cobertura MEDIDA con ratchet (umbral 19 en vitest.config.ts —
+      # 19,86 % statements medido 2026-11-16; bajar del piso rompe el gate).
+      - name: Cobertura (vitest --coverage, ratchet 19 %)
+        working-directory: apps/digielect14
+        run: bunx vitest run --coverage
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cobertura-movil-${{ github.sha }}
+          path: apps/digielect14/coverage/
+          retention-days: 14
