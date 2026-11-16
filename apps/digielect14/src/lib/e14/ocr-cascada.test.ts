@@ -354,7 +354,10 @@ describe("ocr-cascada · correrCascadaOcr (cascada con mocks)", () => {
 
 describe("ocr-cascada · source-scan (contrato del kit en src/)", () => {
   it("bridge: call-site condicional con cascadaActiva + escalonado intacto + GO-B activo", () => {
-    const bridge = lee("src/lib/e14/scanner-core-bridge.ts");
+    // R-28 (H-18, auditoría 2026-11-16): los helpers de la cascada vivían en
+    // scanner-core-bridge.ts y se movieron (move-only) a bridge/ocr.ts — el
+    // scan sigue al CONTENIDO (mismas aserciones, nueva casa).
+    const bridge = lee("src/lib/e14/bridge/ocr.ts");
     // FASE F (plan post-v2.3): el CUERPO de §5 vive en pipeline.ts (el bridge
     // lo ejecuta con pasos INYECTADOS) — el call-site del OCR se coteja ahí,
     // con el prefijo `pasos.` que prueba que va por la inyección.
@@ -410,7 +413,8 @@ describe("ocr-cascada · source-scan (contrato del kit en src/)", () => {
 describe("e14-velocidad-5s-v1 · rechazo temprano (source-scan)", () => {
   // FASE F (plan post-v2.3): el cuerpo de §5 vive en pipeline.ts; los helpers
   // de la cascada siguen en el bridge. El alambre se coteja sobre AMBOS.
-  const bridge = lee("src/lib/e14/scanner-core-bridge.ts");
+  // R-28: los helpers de la cascada se movieron a bridge/ocr.ts (move-only).
+  const bridge = lee("src/lib/e14/bridge/ocr.ts");
   const pipeline = lee("src/lib/e14/pipeline.ts");
   const fuente = `${bridge}\n${pipeline}`;
   it("el veredicto bloqueado se calcula con la verificación del guard (pre-OCR)", () => {
