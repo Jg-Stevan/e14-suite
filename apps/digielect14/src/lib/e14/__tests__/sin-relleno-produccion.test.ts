@@ -12,9 +12,17 @@
  *  3. LISTA DE PERMITIDOS — `ACTA_MOCK` solo puede existir donde nace (seed
  *     del motor) o en el comentario del motor; un import nuevo en la app
  *     hace roja la puerta.
+ *
+ * R-30 (H-25) — AMPLIACIÓN de los puntos ciegos: el walk ahora incluye
+ * `.js`/`.mjs` (excluyendo vendor), los PRODUCTORES de datos demo están
+ * enumerados (modo SIM + simularImagen del store, catálogo de la galería,
+ * seed del motor — si uno se mueve, el guard obliga a tocar la lista a
+ * propósito), las fixtures de la galería SIM solo pueden cargarse desde el
+ * catálogo y los directorios de fixtures se congelan archivo por archivo
+ * (cualquier extensión nueva — .png/.webp/… — de un productor nuevo revienta).
  */
 import { describe, expect, test } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import {
@@ -28,17 +36,20 @@ function leer(rutaRelativa: string): string {
   return readFileSync(join(RAIZ, rutaRelativa), "utf-8");
 }
 
-/** Archivos .ts/.tsx bajo una raíz, excluyendo tests y node_modules. */
+/** Archivos .ts/.tsx/.js/.mjs bajo una raíz, excluyendo tests, node_modules
+ *  y vendor (R-30/H-25: .js/.mjs — los productores de datos demo pueden
+ *  colarse por un script — y `vendor`, código tercerizado con contrato
+ *  propio, p. ej. el jsQR del motor). */
 function archivosFuente(raizRelativa: string): string[] {
   const salida: string[] = [];
   const visitar = (dir: string): void => {
     for (const entrada of readdirSync(dir)) {
-      if (entrada === "node_modules" || entrada === "__tests__") continue;
+      if (entrada === "node_modules" || entrada === "__tests__" || entrada === "vendor") continue;
       const ruta = join(dir, entrada);
       const info = statSync(ruta);
       if (info.isDirectory()) {
         visitar(ruta);
-      } else if (/\.(ts|tsx)$/.test(entrada) && !/\.test\.(ts|tsx)$/.test(entrada)) {
+      } else if (/\.(ts|tsx|js|mjs)$/.test(entrada) && !/\.test\.(ts|tsx|js|mjs)$/.test(entrada)) {
         salida.push(ruta);
       }
     }
@@ -126,5 +137,123 @@ describe("T5.1 — sin relleno en producción (digielect14)", () => {
       }
     }
     expect(infractores).toEqual([]);
+  });
+});
+
+// ─── R-30 (H-25) — vigilancia anti-relleno AMPLIADA ─────────────────────────
+//
+// El guard original tenía puntos ciegos: el walk solo miraba .ts/.tsx (un
+// productor de datos demo colado como script .mjs pasaba inadvertido) y los
+// productores NUEVOS (otro módulo que cargue fixtures, otro import del seed)
+// no quedaban vigilados. Esta suite congela la superficie demo completa del
+// móvil: quién la produce, qué archivos cargan las fixtures y qué archivos
+// demo existen en el árbol.
+
+/** PRODUCTORES de datos demo conocidos del móvil (ruta → rol). Si uno se
+ *  mueve o se elimina, el test obliga a actualizar esta lista A PROPÓSITO
+ *  (nada de productores de demo sin vigilar). */
+const PRODUCTORES_DEMO: ReadonlyArray<[string, string]> = [
+  [
+    "src/lib/e14/store/simulacion.ts",
+    "modo SIM + simularImagen (guion demo — overlay de vista D6, jamás datos reales)",
+  ],
+  [
+    "src/lib/e14/simulacion-imagenes.ts",
+    "catálogo de la galería «Simulación» (fixtures sim-*)",
+  ],
+  [
+    "../../packages/scanner-core/src/dominio/seed.ts",
+    "ACTA_MOCK / mesasIniciales / guionDePuesto del motor (solo modo SIM)",
+  ],
+];
+
+/** Archivos que HOY pueden cargar las fixtures de la galería SIM
+ *  (`@/assets/simuladas/`) y por qué: solo el catálogo. */
+const MENCIONES_PERMITIDAS_SIMULADAS = new Map<string, string>([
+  [
+    "src/lib/e14/simulacion-imagenes.ts",
+    "catálogo de la galería (imports estáticos de thumbs + cargadores dinámicos S-6)",
+  ],
+]);
+
+/** Ningún archivo de producción puede mencionar las fixtures `acta-sim-*`:
+ *  hoy SOLO las cita un comentario de un test (excluido del walk) — la
+ *  lista de permitidos vive VACÍA a propósito. */
+const MENCIONES_PERMITIDAS_ACTA_SIM: string[] = [];
+
+/** Fixtures demo que HOY viven en el árbol — EXACTAS: ninguna más (ni otro
+ *  nombre, ni otra extensión: .png/.webp/… de un productor nuevo también
+ *  revienta aquí). */
+const FIXTURES_ASSETS_SIM = [
+  "acta-sim-baja.jpg",
+  "acta-sim-extra-1.jpg",
+  "acta-sim-extra-2.jpg",
+  "acta-sim-intermedia.jpg",
+];
+const FIXTURES_SIMULADAS = [
+  "sim-color.jpg",
+  // Thumb heredado junto a su original (histórico del kit — el resto vive
+  // en thumbs/): se congela donde está.
+  "sim-color.thumb.jpg",
+  "sim-inclinada.jpg",
+  "sim-normal.jpg",
+  "sim-recorte-inferior.jpg",
+  "sim-recorte-superior.jpg",
+  "sim-rotada.jpg",
+  "sim-sombras.jpg",
+];
+const FIXTURES_SIMULADAS_THUMBS = [
+  "sim-color.thumb.jpg",
+  "sim-inclinada.thumb.jpg",
+  "sim-normal.thumb.jpg",
+  "sim-recorte-inferior.thumb.jpg",
+  "sim-recorte-superior.thumb.jpg",
+  "sim-rotada.thumb.jpg",
+  "sim-sombras.thumb.jpg",
+];
+
+describe("R-30 (H-25) — vigilancia anti-relleno ampliada (digielect14)", () => {
+  test("los productores de datos demo conocidos siguen existiendo (vigilancia consciente)", () => {
+    // La lista ES la vigilancia: si un productor se mueve/elimina, este
+    // test obliga a actualizarla a propósito en el mismo commit.
+    const faltantes = PRODUCTORES_DEMO.filter(
+      ([ruta]) => !existsSync(join(RAIZ, ruta)),
+    ).map(([ruta]) => ruta);
+    expect(faltantes).toEqual([]);
+  });
+
+  test("las fixtures de la galería SIM solo se cargan desde el catálogo", () => {
+    const infractores: string[] = [];
+    for (const archivo of archivosFuente("src")) {
+      if (!readFileSync(archivo, "utf-8").includes("@/assets/simuladas")) continue;
+      const relativa = relative(RAIZ, archivo).replace(/\\/g, "/");
+      if (!MENCIONES_PERMITIDAS_SIMULADAS.has(relativa)) infractores.push(relativa);
+    }
+    expect(infractores).toEqual([]);
+  });
+
+  test("nadie en producción menciona las fixtures acta-sim-* (lista de permitidos VACÍA)", () => {
+    const infractores: string[] = [];
+    for (const archivo of archivosFuente("src")) {
+      if (!readFileSync(archivo, "utf-8").includes("acta-sim-")) continue;
+      const relativa = relative(RAIZ, archivo).replace(/\\/g, "/");
+      if (!MENCIONES_PERMITIDAS_ACTA_SIM.includes(relativa)) infractores.push(relativa);
+    }
+    expect(infractores).toEqual([]);
+  });
+
+  test("los directorios de fixtures demo contienen EXACTAMENTE los archivos conocidos", () => {
+    // Cualquier archivo NUEVO en los directorios de fixtures (otro nombre u
+    // OTRA EXTENSIÓN — .png, .webp, .pdf…) es un productor de datos demo
+    // sin vigilar: el guard original solo miraba código, nunca los assets.
+    expect(readdirSync(join(RAIZ, "src/assets")).sort()).toEqual(
+      [...FIXTURES_ASSETS_SIM, "simuladas"].sort(),
+    );
+    expect(readdirSync(join(RAIZ, "src/assets/simuladas")).sort()).toEqual(
+      [...FIXTURES_SIMULADAS, "thumbs"].sort(),
+    );
+    expect(
+      readdirSync(join(RAIZ, "src/assets/simuladas/thumbs")).sort(),
+    ).toEqual([...FIXTURES_SIMULADAS_THUMBS].sort());
   });
 });
