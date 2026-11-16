@@ -69,7 +69,7 @@ export interface FlagsApp {
   // null = OFF explícito vía override ({"ocrNativoUrl":null}; validator SEC-10
   // lo acepta). Al morir el sidecar la tarjeta desarma la URL EN RUNTIME
   // (configurarNativo(null)) — este flag persistido NO se toca.
-  ocrNativoUrl: string | null; // default "http://127.0.0.1:8765" (D81) — URL del SIDE CAR nativo: si /salud responde, el det+rec del acta corre en CPU nativa (onnxruntime, 4 hilos) en vez de WASM; cualquier fallo (red, timeout, JSON raro) cae al motor de siempre SIN tocar score/gate/dedup/auto-envío. Solo 127.0.0.1/localhost (validator de la tabla) — jamás un remoto configurable
+  ocrNativoUrl: string | null; // default "http://127.0.0.1:8765" (D81) — URL del SIDE CAR nativo: si /salud responde, el det+rec del acta corre en CPU nativa (onnxruntime, 4 hilos) en vez de WASM; cualquier fallo (red, timeout, JSON raro) cae al motor de siempre SIN tocar score/gate/dedup/auto-envío. Solo 127.0.0.1/localhost (validator de la tabla) — jamás un remoto configurable. H-44: puede traer ?token=<hex> (token efímero que imprime el arranque del sidecar; el cliente lo manda como header x-sidecar-token en /ocr y /acta)
   // ─── KIT e14-ocr-nativo-v1 (FASE 2) — campo ADITIVO AL FINAL (D57) ───
   actaNativa: boolean; // default false. true + sidecar vivo = el ACTA COMPLETA (quad, warp, b/n, sondeo de orientación y OCR) corre en el sidecar en UNA sola ida: el JS conserva calidad, esquinas, completitud, score, gate, dedup y envío. El prefetched del runner masiva alimenta ADEMÁS la capa 0 (el payload del QR que el sidecar lee del warp), así que el ladder jsQR de 8-22 s no se paga. Sidecar mudo o fallo → pipeline JS de siempre, byte-idéntico
   // ─── KIT ocr-ep-webgpu-v1 — campo ADITIVO AL FINAL (D57) ───

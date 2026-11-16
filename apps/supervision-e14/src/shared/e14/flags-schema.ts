@@ -52,12 +52,18 @@ export function endpointReportesValido(v: unknown): ValorFlag | undefined {
 /** KIT e14-ocr-nativo-v1 — mismo criterio SEC-10 aplicado al sidecar: quien
  *  edita flags.json/localStorage NO puede apuntar el OCR a un servidor
  *  arbitrario (los recortes de actas son datos sensibles). Se acepta SOLO
- *  null o un http:// a 127.0.0.1/localhost con puerto opcional y sin ruta,
- *  query ni credenciales. */
+ *  null o un http:// a 127.0.0.1/localhost con puerto opcional, sin ruta ni
+ *  credenciales. H-44 (TRAY-C-07): se admite además UN query opcional
+ *  `?token=<8-128 chars sin caracteres reservados>` — el token EFÍMERO que
+ *  el sidecar imprime al arrancar (uuid4) y el cliente manda como header
+ *  `x-sidecar-token` en los POST. Nada más pasa: ni ruta, ni otros
+ *  parámetros — el host sigue clavado a loopback. */
 export function urlSidecarLocalValida(v: unknown): ValorFlag | undefined {
   if (v === null) return null;
   if (typeof v !== "string") return undefined;
-  return /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d{1,5})?\/?$/.test(v) ? v : undefined;
+  return /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d{1,5})?\/?(?:\?token=[A-Za-z0-9_-]{8,128})?$/.test(v)
+    ? v
+    : undefined;
 }
 
 /** typeof number && Number.isFinite → clamp redondeado a [min, max]

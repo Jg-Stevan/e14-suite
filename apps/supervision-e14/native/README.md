@@ -28,6 +28,33 @@ Chrome pre-vuela todo `fetch` hacia `http://127.0.0.1` con
 `Access-Control-Request-Private-Network`; hoy es advertencia, mañana será corte. Sin
 esa cabecera de respuesta, el sitio publicado deja de ver el sidecar sin explicación.
 
+### H-44 — el token efímero de `/ocr` y `/acta`
+
+El modelo anterior dejaba un hueco: loopback + CORS + LNA expulsan a la red y a las
+páginas ajenas, pero cualquier **otro proceso local** del usuario podía hacer `POST` a
+piel y encolar actas en su CPU. Desde H-44 (auditoría 2026-11-16, TRAY-C-07) los dos
+endpoints de trabajo **exigen un token efímero**:
+
+- Se genera al arrancar (`uuid.uuid4().hex`), se imprime junto al puerto y **muere con
+  el proceso** — no se persiste ni viaja en archivo.
+- Se acepta como header `x-sidecar-token: <hex>` (el camino del navegador, ya
+  allowlistado en el preflight CORS) **o** como `?token=<hex>` en la URL del POST.
+- Sin token o con token viejo → `401` con un JSON que dice cómo arreglarlo.
+- `GET /salud` queda **sin token a propósito**: la tarjeta del panel lo sondea para
+  detectar el acelerador y no conoce el token.
+
+**Modelo de amenaza residual** (capas, de afuera hacia adentro): bind a `127.0.0.1`
+(fuera de la red) → allowlist CORS `origen_permitido` (fuera las páginas ajenas) →
+permiso LNA de Chrome 142+ (el visitante consiente el acceso a loopback) → token
+efímero (fuera los demás procesos locales). Lo que queda: un proceso local con
+permisos de **leer la consola del sidecar** también puede leer el token — a eso no
+llega esta mitigación, y es el riesgo residual aceptado.
+
+Ojo con el flujo del visitante: sin `?token=` en el override, `/salud` responde (la
+tarjeta dirá `CPU`) pero los `POST` caen en `401` y las actas salen por WASM con un
+log `POST /ocr 401` en consola. Reiniciar el sidecar **rota** el token: actualiza el
+override o el lote vuelve a WASM.
+
 ## Distribución: el ZIP para el visitante
 
 `127.0.0.1` es la máquina del visitante, nunca el servidor — o sea, publicado el sitio
@@ -50,17 +77,20 @@ pip install -r native/requirements.txt
 python native/servidor.py                 # motor v5, puerto 8765, 2 sesiones
 ```
 
-Qué debes ver (las dos líneas, tal como las imprime `servidor.py:346`):
+Qué debes ver (las tres líneas, tal como las imprime `servidor.py`):
 
 ```
 [e14-nativo] sidecar en http://127.0.0.1:8765 · motor v5 · cls-lineas False · 2 sesión(es) × 2 hilos — calentando…
+[e14-nativo] token  3f9c1a72…  (header x-sidecar-token o ?token= en POST /ocr y /acta)
 [e14-nativo] LISTO (calentada en … ms)
 ```
 
-La segunda línea es la que importa: mientras no diga `LISTO`, el `/salud` ya
-responde pero la primera acta paga el calentamiento del grafo. C-23 — la
-calentada usa las fixtures sintéticas vigentes (`acta-sim-*.jpg`); si el clon
-no las tiene, arranca frío sin error y dirá `LISTO (sin acta de ejemplo: no calentada)` —
+La línea del **token** (H-44) es la llave de `/ocr` y `/acta`: cópiala entera para
+configurar la app (ver abajo). La tercera línea es la que importa para el primer
+lote: mientras no diga `LISTO`, el `/salud` ya responde pero la primera acta paga el
+calentamiento del grafo. C-23 — la calentada usa las fixtures sintéticas vigentes
+(`acta-sim-*.jpg`); si el clon no las tiene, arranca frío sin error y dirá
+`LISTO (sin acta de ejemplo: no calentada)` —
 en ese caso la PRIMERA acta paga el arranque frío (~13 s medidos en el informe
 del sidecar) y las siguientes van calientes. Ver D81.
 
@@ -80,14 +110,24 @@ encienden por la puerta oficial de overrides, en la consola del navegador:
 ```js
 localStorage.setItem(
   "e14-flags-overrides",
-  JSON.stringify({ ocrNativoUrl: "http://127.0.0.1:8765", actaNativa: true }),
+  JSON.stringify({
+    ocrNativoUrl: "http://127.0.0.1:8765?token=<el-hex-de-la-línea-[e14-nativo]-token>",
+    actaNativa: true,
+  }),
 );
 location.reload();
 ```
 
-Qué debes ver: `/salud` 200 en la pestaña de red y, en consola, las actas con
-etapas nativas (el navegador deja de pagar det/rec WASM). Para apagarlo:
+El `?token=` es el token efímero del arranque (H-44): el cliente lo pela de la URL y
+lo manda como header `x-sidecar-token` en cada `POST /ocr` y `/acta`; el `/salud` de
+la sonda no lo necesita. El validador de la flag solo acepta loopback con ese único
+query — nada de rutas ni otros parámetros. **Cada reinicio del sidecar rota el
+valor**: si el lote vuelve a WASM con `POST /ocr 401` en consola, actualiza el
+override con la línea nueva. Para apagarlo:
 `localStorage.removeItem("e14-flags-overrides")` y recargar.
+
+Qué debes ver: `/salud` 200 en la pestaña de red y, en consola, las actas con
+etapas nativas (el navegador deja de pagar det/rec WASM).
 
 ## Medido en el lote demo (6 actas reales, 4 núcleos, HD Graphics 520)
 
@@ -115,6 +155,7 @@ depende del execution provider del navegador.
 
 | Síntoma | Causa | Qué hacer |
 | --- | --- | --- |
+| Tarjeta en `CPU` pero el lote va a ritmo WASM y la consola dice `POST /ocr 401` | H-44 — falta el `?token=` en el override (o el sidecar se reinició y lo rotó) | copia la línea `[e14-nativo] token …` del arranque y actualiza `ocrNativoUrl` con `?token=` |
 | `YA HAY un sidecar en …` | doble arranque (Windows permite el bind duplicado) | mata el PID viejo o usa `--puerto` distinto; **nunca** `--forzar` para medir |
 | Números 2-3× peores sin tocar código | máquina saturada u otro agente compilando | `python native/bench-acta.py` solo; compara A/B back-to-back antes de sentenciar |
 | Acta en `ERROR` con `CANNOT RUN INFERENCE. INVALID SESSION ID` | sesión ORT compartida muerta por el watchdog de otra acta | ya se reintenta sola ([runner.ts:1453](file:///c/Users/JG/Documents/Qoder/2026-11-02/a8b531fd/supervision-e14/src/modules/digitalizador/lib/e14/masiva/runner.ts#L1453)); si persiste, baja `poolWorkers` a 1 |

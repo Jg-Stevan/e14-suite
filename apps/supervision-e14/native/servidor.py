@@ -13,6 +13,10 @@ warp, la b/n y el sondeo de orientación):
                  "quad":[[x,y]×4 normalizados], "quadOrigen","rot","qr",
                  "ancho","alto","nBoxes","nLineas","etapas","totalMs"}
 
+H-44 (TRAY-C-07): /ocr y /acta exigen el TOKEN efímero que el arranque
+imprime junto al puerto (header `x-sidecar-token` o `?token=` en la URL);
+/salud queda LIBRE porque el panel lo sondea para detectar el acelerador.
+
 La app sigue haciendo SU gate, score, dedup y envío — del sidecar salen la
 imagen de presentación y el texto ya enderezado. Cualquier fallo o timeout hace
 que la app caiga al camino WASM de siempre (kill-switch: flag `ocrNativoUrl` a
@@ -24,12 +28,15 @@ from __future__ import annotations
 
 import argparse
 import glob
+import hmac
 import json
 import os
 import sys
 import threading
 import time
+import urllib.parse
 import urllib.request
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import base64
@@ -243,6 +250,10 @@ def _dataurl_calentamiento() -> str | None:
 
 class Manejador(BaseHTTPRequestHandler):
     motor: Motor = None  # inyectado por servir()
+    # H-44 (TRAY-C-07) — token efímero de /ocr y /acta. Se inyecta en servir():
+    # nace y muere con el proceso (uuid4), NO se persiste ni se pasa por
+    # archivo — un token que sobreviviera al arranque dejaría de ser efímero.
+    token: str = ""
     protocol_version = "HTTP/1.1"
 
     def _cabeceras(self, codigo: int, cuerpo: bytes):
@@ -280,7 +291,7 @@ class Manejador(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", origen or "null")
         self.send_header("Vary", "Origin")
         self.send_header("Cross-Origin-Resource-Policy", "cross-origin")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, x-sidecar-token")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         # Private Network Access: cuando una página PÚBLICA (https://*.pages.dev)
         # pide algo a 127.0.0.1 el navegador manda un preflight con
@@ -319,6 +330,26 @@ class Manejador(BaseHTTPRequestHandler):
         ruta = self.path.split("?")[0]
         if not (ruta.startswith("/ocr") or ruta.startswith("/acta")):
             return self._json(404, {"error": "ruta"})
+        # H-44 (TRAY-C-07) — token efímero. El bind a loopback, la allowlist
+        # CORS y el permiso LNA de Chrome ya dejan FUERA a la red y a las
+        # páginas ajenas; el token cierra el hueco que les queda a esos tres:
+        # CUALQUIER otro proceso local del usuario podía encolar actas en el
+        # CPU con un POST a pelo. Se acepta el header `x-sidecar-token` (el
+        # camino del navegador — ojo: el preflight lo allowlista arriba) o
+        # `?token=` en la URL (curl / brújula rápida). /salud NO lo exige: el
+        # panel lo sondea para detectar el acelerador y no conoce el token.
+        query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        recibido = self.headers.get("x-sidecar-token", "") or (query.get("token") or [""])[0]
+        # compare_digest (no `==`) para no regalar el tiempo de comparación;
+        # con str NO-ascii lanza TypeError, así que se filtra antes.
+        if not (recibido.isascii() and hmac.compare_digest(recibido, self.token)):
+            self.log_error("H-44: token ausente o incorrecto en POST %s", ruta)
+            return self._json(401, {
+                "error": "token",
+                "detalle": "falta o no coincide el token del sidecar: cópialo de la línea "
+                           "[e14-nativo] token … del arranque y mándalo como header "
+                           "x-sidecar-token o como ?token= en la URL",
+            })
         try:
             cuerpo = self._cuerpo()
             cap = int(cuerpo.get("cap", 1280))
@@ -369,6 +400,12 @@ def servir(motor: str, puerto: int, con_cls: bool, sesiones: int, hilos: int | N
         raise SystemExit(2)
     m = Motor(motor, con_cls, sesiones, hilos)
     Manejador.motor = m
+    # H-44 — el token se genera AQUÍ, ya con el puerto libre y los modelos
+    # cargándose: es la identidad de ESTE arranque. Se imprime junto al puerto
+    # y el operador lo pega en la app como ?token= del override de ocrNativoUrl
+    # (ver native/README.md); reiniciar el sidecar lo ROTA — hay que actualizar
+    # el override o los POST caen a WASM (con /salud siguiendo OK).
+    Manejador.token = uuid.uuid4().hex
     # SIN SO_REUSEADDR: así un puerto ocupado es un error ruidoso en lugar de
     # un segundo servidor fantasma (el `otro_sidecar` de arriba da el mensaje
     # legible; este es el cinturón para el caso de un no-sidecar escuchando).
@@ -377,6 +414,8 @@ def servir(motor: str, puerto: int, con_cls: bool, sesiones: int, hilos: int | N
     print(f"[e14-nativo] sidecar en http://127.0.0.1:{puerto} · motor {motor} · "
           f"cls-lineas {con_cls} · {sesiones} sesión(es) × "
           f"{m.hilos} hilos — calentando…", flush=True)
+    print(f"[e14-nativo] token  {Manejador.token}  "
+          f"(header x-sidecar-token o ?token= en POST /ocr y /acta)", flush=True)
     ms = m.calentar()
     print(f"[e14-nativo] LISTO{f' (calentada en {ms} ms)' if ms else ' (sin acta de ejemplo: no calentada)'}",
           flush=True)

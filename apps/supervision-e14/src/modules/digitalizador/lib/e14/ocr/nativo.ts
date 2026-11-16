@@ -3,6 +3,11 @@
 import { configurarNativo } from "@jg-stevan/scanner-core/ocr/motores/nativo";
 import { leerFlags } from "../flags";
 
+// H-44 (TRAY-C-07): la URL puede traer `?token=<hex>` — el token efímero que
+// el sidecar imprime al arrancar y el operador pega en el override de
+// `ocrNativoUrl`. El cliente del paquete lo separa y lo manda como header
+// `x-sidecar-token` en los POST (/salud no lo exige); aquí solo entra por si
+// el flag trae query, que no debe romper NINGUNA URL derivada.
 try {
   configurarNativo(leerFlags().ocrNativoUrl ?? null);
 } catch {
@@ -30,7 +35,10 @@ export async function sondearUrlSidecarDirecta(
   url: string,
   timeoutMs = 1_200,
 ): Promise<boolean> {
-  const base = url.replace(/\/+$/, "");
+  // H-44 — la URL puede traer `?token=`: /salud NO lo exige, así que se
+  // STRIP antes de concatenar (con query adentro el path quedaría
+  // `…?token=…/salud`, que es un 404 silencioso para la sonda).
+  const base = url.split("?")[0].replace(/\/+$/, "");
   const control = new AbortController();
   const timer = setTimeout(() => control.abort(), timeoutMs);
   try {

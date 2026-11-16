@@ -24,9 +24,29 @@ import { logger } from "../../dominio/logger";
 // — validador SEC-10: solo localhost). D la hereda apagada (null) hasta que
 // su mantenedor la cablee — doctrina: el sidecar es ACELERACIÓN, jamás requisito.
 let urlNativo: string | null = null;
-/** Fija la URL del sidecar nativo (null/string vacío = apagado). */
+/** H-44 (TRAY-C-07) — el token efímero del sidecar, si la URL configurada lo
+ * trae. FLUJO: el token lo imprime el sidecar al arrancar (`[e14-nativo]
+ * token  <hex> …`) y el operador lo pega como `?token=` en el override de
+ * `ocrNativoUrl` (localStorage `e14-flags-overrides`). Aquí se separa de la
+ * URL y viaja como header `x-sidecar-token` en cada POST a /ocr y /acta
+ * (el ?query no puede ir en el fetch: rompería el path); /salud NO lo
+ * necesita — el sidecar lo deja abierto a propósito para que el panel pueda
+ * sondear la presencia del acelerador sin conocerlo. */
+let tokenNativo: string | null = null;
+/** Fija la URL del sidecar nativo (null/string vacío = apagado). Acepta un
+ *  `?token=<hex>` final (H-44) que se traslada al header de los POST. */
 export function configurarNativo(url: string | null): void {
-  urlNativo = url && url.length > 0 ? url : null;
+  urlNativo = null;
+  tokenNativo = null;
+  if (!url) return;
+  const corte = url.indexOf("?");
+  if (corte >= 0) {
+    // La parte base sin query; el token (si viene) queda para el header.
+    urlNativo = url.slice(0, corte) || null;
+    tokenNativo = new URLSearchParams(url.slice(corte + 1)).get("token");
+  } else {
+    urlNativo = url;
+  }
 }
 
 export interface OcrNativoSalida {
@@ -98,9 +118,15 @@ function urlBase(): string | null {
 /** Dónde estamos esperando encontrar el sidecar (null = flag apagado en esta
  *  compilación). Lo muestra la tarjeta para que el visitante sepa qué puerto
  *  tiene que estar escuchando — el `--puerto` del .exe es configurable y el
- *  default del exe NO tiene por qué coincidir con el del flag. */
+ *  default del exe NO tiene por qué coincidir con el del flag.
+ *  H-44 — devuelve la URL CON su `?token=` cuando lo hay: la tarjeta congela
+ *  este valor al montar y RE-ARMA el motor con él (`configurarNativo(url)`);
+ *  devolver la base pelada dejaría el re-arme sin token y los POST en 401
+ *  (caída silenciosa a WASM). El fetch nunca usa esta cadena: usa urlBase(). */
 export function urlLadoNativo(): string | null {
-  return urlBase();
+  const base = urlBase();
+  if (!base) return null;
+  return tokenNativo ? `${base}?token=${tokenNativo}` : base;
 }
 
 async function conTimeout<T>(hacer: (signal: AbortSignal) => Promise<T>, ms: number): Promise<T> {
@@ -192,14 +218,29 @@ export async function ocrNativo(dataUrl: string, cap: number): Promise<OcrNativo
       (signal) =>
         fetch(`${url}/ocr`, {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            // H-44 — el token efímero del arranque; sin él el sidecar responde
+            // 401 y esta llamada devuelve null (caída al WASM de siempre).
+            ...(tokenNativo ? { "x-sidecar-token": tokenNativo } : {}),
+          },
           body: JSON.stringify({ imagen: dataUrl, cap }),
           signal,
           ...OPCIONES_LOOPBACK,
         }),
       OCR_TIMEOUT_MS,
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // H-44 — el 401 es el único fallo que NO es "sidecar caído": el proceso
+      // está vivo (la sonda /salud sigue OK) pero el token no llegó/rotó por
+      // un reinicio. Se deja rastro — sin esto, la caída a WASM es muda.
+      if (res.status === 401) {
+        logger.info(
+          `[e14-nativo] POST /ocr 401: token ausente o viejo — actualiza ?token= de ocrNativoUrl con la línea [e14-nativo] token del arranque`,
+        );
+      }
+      return null;
+    }
     const j = (await res.json()) as Record<string, unknown>;
     if (typeof j.texto !== "string" || typeof j.conf !== "number") return null;
     salud = { url, ok: true, ms: performance.now() }; // una lectura buena revalida el sondeo
@@ -261,14 +302,25 @@ export async function actaNativa(dataUrl: string, cap = 1280): Promise<ActaNativ
       (signal) =>
         fetch(`${url}/acta`, {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            // H-44 — mismo token efímero que /ocr (ver ocrNativo).
+            ...(tokenNativo ? { "x-sidecar-token": tokenNativo } : {}),
+          },
           body: JSON.stringify({ imagen: dataUrl, cap }),
           signal,
           ...OPCIONES_LOOPBACK,
         }),
       ACTA_TIMEOUT_MS,
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (res.status === 401) {
+        logger.info(
+          `[e14-nativo] POST /acta 401: token ausente o viejo — actualiza ?token= de ocrNativoUrl con la línea [e14-nativo] token del arranque`,
+        );
+      }
+      return null;
+    }
     const j = (await res.json()) as Record<string, unknown>;
     if (
       typeof j.procesada !== "string" ||

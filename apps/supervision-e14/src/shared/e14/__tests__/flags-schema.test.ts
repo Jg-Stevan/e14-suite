@@ -36,6 +36,7 @@ import {
   CLAVES_FLAGS_JSON_HISTORICAS,
   CLAVES_OVERRIDES_HISTORICAS,
   sanearConEsquema,
+  urlSidecarLocalValida,
 } from "@/shared/e14/flags-schema";
 import { FLAGS_DEFAULT, sanearFlags } from "@/modules/digitalizador/lib/e14/flags";
 import { leerOverridesFlags, CLAVE_OVERRIDES } from "@/modules/digitalizador/lib/e14/obs/politica";
@@ -309,5 +310,43 @@ describe("D98-sup (C-2) — default del kill-switch loteDemoLocal", () => {
     // false pasa el saneo y esconde el botón.
     expect(sanearFlags({ loteDemoLocal: false })).toEqual({ loteDemoLocal: false });
     expect(sanearConEsquema({ loteDemoLocal: false })).toEqual({ loteDemoLocal: false });
+  });
+});
+
+describe("H-44 (TRAY-C-07) — ocrNativoUrl acepta el token efímero del sidecar", () => {
+  test("la base loopback sigue igual; SOLO se admite UN query ?token=<valor>", () => {
+    // Lo que ya pasaba, sigue pasando (invariante de la tabla: jamás se
+    // rechaza lo que antes se aceptaba).
+    expect(urlSidecarLocalValida(null)).toBe(null);
+    expect(urlSidecarLocalValida("http://127.0.0.1:8765")).toBe("http://127.0.0.1:8765");
+    expect(urlSidecarLocalValida("http://127.0.0.1:8765/")).toBe("http://127.0.0.1:8765/");
+    expect(urlSidecarLocalValida("http://localhost")).toBe("http://localhost");
+    // El override con token (uuid4().hex del arranque del sidecar) pasa…
+    expect(urlSidecarLocalValida("http://127.0.0.1:8765?token=deadbeefcafe0123")).toBe(
+      "http://127.0.0.1:8765?token=deadbeefcafe0123",
+    );
+    expect(urlSidecarLocalValida("http://127.0.0.1:8765/?token=deadbeefcafe0123")).toBe(
+      "http://127.0.0.1:8765/?token=deadbeefcafe0123",
+    );
+    // …y por AMBAS puertas (tabla única), que es como el operador lo escribe.
+    expect(sanearConEsquema({ ocrNativoUrl: "http://127.0.0.1:8765?token=deadbeefcafe0123" })).toEqual({
+      ocrNativoUrl: "http://127.0.0.1:8765?token=deadbeefcafe0123",
+    });
+    escribirOverrides('{"ocrNativoUrl":"http://127.0.0.1:8765?token=deadbeefcafe0123"}');
+    expect((leerOverridesFlags() as Record<string, unknown>).ocrNativoUrl).toBe(
+      "http://127.0.0.1:8765?token=deadbeefcafe0123",
+    );
+  });
+
+  test("SEC-10 intacto: remoto, ruta, otros parámetros o token vacío → RECHAZADO", () => {
+    expect(urlSidecarLocalValida("http://192.168.0.1:8765?token=deadbeefcafe0123")).toBeUndefined();
+    expect(urlSidecarLocalValida("https://127.0.0.1:8765?token=deadbeefcafe0123")).toBeUndefined();
+    expect(urlSidecarLocalValida("http://127.0.0.1:8765/otra")).toBeUndefined();
+    expect(urlSidecarLocalValida("http://127.0.0.1:8765?token=")).toBeUndefined();
+    expect(urlSidecarLocalValida("http://127.0.0.1:8765?token=corto")).toBeUndefined();
+    expect(urlSidecarLocalValida("http://127.0.0.1:8765?otro=1")).toBeUndefined();
+    expect(urlSidecarLocalValida("http://127.0.0.1:8765?token=deadbeefcafe0123&otro=1")).toBeUndefined();
+    expect(urlSidecarLocalValida("http://127.0.0.1:8765?token=con%20espacio")).toBeUndefined();
+    expect(urlSidecarLocalValida(42)).toBeUndefined();
   });
 });

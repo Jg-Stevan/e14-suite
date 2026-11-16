@@ -41,12 +41,16 @@ Qué debes ver (la primera vez tarda más porque Windows Defender está escanean
 
 ```
 [e14-nativo] sidecar en http://127.0.0.1:8765 · motor v5 · cls-lineas False · 2 sesión(es) × 2 hilos — calentando…
+[e14-nativo] token  3f9c1a72…  (header x-sidecar-token o ?token= en POST /ocr y /acta)
 [e14-nativo] LISTO (sin acta de ejemplo: no calentada)
 ```
 
 `sin acta de ejemplo: no calentada` es **lo esperado** en el congelado: la foto de
 calentamiento vive en `assets/actas-demo` y no viaja dentro del ZIP (D81). La primera
 acta del lote paga ese recargo una vez.
+
+La línea del `token` (H-44) es la llave de `/ocr` y `/acta`: cópiala — la necesitas
+en A.3 para que las actas salgan de verdad por CPU nativa.
 
 `/salud` empieza a contestar entre **5 y 15 s** la primera vez; en los arranques
 siguientes, en **4,5-6,3 s**.
@@ -67,10 +71,27 @@ LISTO — LAS ACTAS SALEN POR CPU NATIVA
 El `PID` que aparece es el proceso de la consola que dejaste abierta. Corre el lote
 y en el informe de la corrida debe figurar `ocrNativo` con el motor.
 
+**Token (H-44):** para que las actas salgan por el sidecar, el `ocrNativoUrl` de la
+app necesita el token de la línea `[e14-nativo] token …`. En la consola del navegador
+(del sitio del panel):
+
+```js
+localStorage.setItem(
+  "e14-flags-overrides",
+  JSON.stringify({ ocrNativoUrl: "http://127.0.0.1:8765?token=<el-hex-del-arranque>", actaNativa: true }),
+);
+location.reload();
+```
+
+Sin él la tarjeta igual dirá `CPU` (el `/salud` de la sonda no exige token) pero los
+`POST` devuelven `401` y el lote sale por WASM con un `POST /ocr 401` en consola. Si
+reinicias el sidecar, el token CAMBIA — actualiza el override.
+
 ### A.4 Matriz de corrección rápida (visitante)
 
 | Síntoma | Causa | Qué hacer |
 | --- | --- | --- |
+| Tarjeta en `CPU` pero el lote va a ritmo WASM (`POST /ocr 401` en consola) | H-44 — falta el `?token=` en el override, o el sidecar se reinició y lo rotó | copia la línea `[e14-nativo] token …` del arranque y actualiza `ocrNativoUrl` (ver A.3) |
 | La tarjeta sigue en `WASM` aunque la consola está abierta | el ZIP se ejecutó en otro puerto, o SmartScreen lo bloqueó sin avisar | cierra la consola y vuelve a abrirla; mira que diga `8765` |
 | `YA HAY un sidecar en http://127.0.0.1:8765` y se cerró | ya tenías otro corriendo (Windows permite el doble bind y reparte el tráfico: es MÁS lento) | cierra la consola vieja y deja UNA sola |
 | La consola se cierra sola al instante | SmartScreen lo tumbó, o falta una .dll de Visual C++ | ejecuta de nuevo con «Ejecutar de todas formas»; si persiste, `Windows Terminal` → «Instalar» el *Visual C++ 2015-2022 Redistributable* |
