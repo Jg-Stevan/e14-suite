@@ -2,27 +2,40 @@
 
 Reglas para agentes IA (y personas) que editan este repo. El producto es un
 digitalizador de actas E-14 que corre en el navegador del celular; trabaja con
-**datos electorales reales**.
+**datos electorales reales**. Este repo es un workspace del monorepo
+`e14-suite` (raíz: `../../`).
 
 ## Comandos (verificados contra `package.json`)
 
-- `bun install` — gestor: **bun**. No uses npm ni pnpm.
+- `bun install` — desde la RAÍZ del monorepo (workspaces bun). No uses npm ni pnpm.
 - `bun run preparar` — materializa lo que no se versiona: vendor copiado de `node_modules` y modelos/OpenCV descargados con SHA-256 fijado (`scripts/assets.lock.json`). Un clon limpio lo necesita antes de `bun run test`.
 - `bun run dev` — Next.js en el puerto 3000 (OCR a un hilo: `next dev` no emite
   cabeceras COOP/COEP, así que `crossOriginIsolated` es falso).
-- `bun run verificar` — preparar + typecheck + lint + test. **Es la puerta de salida**: nada
+- `bun run verificar` — preparar + typecheck + lint + test + test:paquete. **Es la puerta de salida**: nada
   se declara terminado sin este comando en verde, y se reporta su salida real.
-- `bun run build` — bundle de producción (el `prebuild` genera el worker de capa 0).
-- Sueltas: `bun run typecheck` · `bun run lint` · `bun run test` · `bunx knip`.
+- `bun run build` — bundle de producción (el `prebuild` genera los workers).
+- Sueltas: `bun run typecheck` · `bun run lint` · `bun run test` (vitest) ·
+  `bun run test:paquete` (suite del motor, `bun test ../../packages/scanner-core`) · `bunx knip`.
 - `bash scripts/check-quality.sh` — el gate completo (7 pasos: lo anterior más
-  build, los 2 smoke de worker y los 7 harnesses `scripts/qa-*.ts`). Es lo mismo
-  que corre `.github/workflows/quality.yml`.
+  build, los 3 smoke de worker y los harnesses `scripts/qa-*.ts`). Lo que corre
+  CI vive en `.github/workflows/` de la RAÍZ del monorepo.
 
 ## Entorno (bun 1.4.2 y finales de línea)
 
-- **bun fijo en 1.4.2** en los dos workflows. Los smoke comparan los artefactos
-  generados de `public/scanner/` byte a byte y el minificador de bun cambia entre
+- **bun fijado en 1.4.2 en sus 4 fuentes** (R-03, auditoría 2026-11-16):
+  `engines` y `packageManager` del `package.json` RAÍZ, y `bun-version` de los
+  workflows del `.github/` raíz. Los smoke comparan los artefactos de
+  `public/scanner/` byte a byte y el minificador de bun cambia entre
   versiones: subir bun sin regenerar los workers pone el gate rojo.
+- Clon limpio del monorepo, pasos completos (los ocultos que mordían — R-03):
+  1. `bun install` desde la RAÍZ. Con bun ≠ 1.4.x el lockfile v2 no parsea
+     (`UnknownLockfileVersion`) y la re-resolución instala drift que rompe lint.
+  2. `cd apps/digielect14 && bun run preparar` (vendor + assets SHA-256) ANTES
+     de `bun run test`.
+  3. El panel (`apps/supervision-e14`) usa linker **hoisted** (`bunfig.toml`
+     propio); sus tests se corren desde SU carpeta. Los workers de capa 0 y
+     fallback de ESTA app se precompilan en `prebuild`/`preparar` — sin eso el
+     smoke de frescura falla.
 - `.gitattributes` fuerza LF y `-text` en `public/scanner/*.js`. Sin eso, un clon
   en Windows con `core.autocrlf=true` materializa CRLF y la frescura falla.
 - En Windows + Git Bash, `NEXT_PUBLIC_BASE_PATH=/digielect14` se manglea a una
@@ -52,12 +65,9 @@ digitalizador de actas E-14 que corre en el navegador del celular; trabaja con
   su retirada de la historia está ejecutada con los scripts de `scripts/`).
 - No añadas dependencias, telemetría ni servicios externos sin preguntarlo antes.
 - Nunca `git push --force` ni reescritura de historial. **Excepción única y
-  autorizada por el mantenedor**: purgas puntuales de binarios del historial
-  (p. ej. `git filter-repo` para dejar de versionar modelos). Requisitos:
-  bundle de respaldo con `--all`, verificación post-reescritura,
-  `--force-with-lease` (nunca `--force` a secas) y registrar en
-  `docs/DECISIONS.md` el SHA previo y el motivo. Cualquier otro caso sigue
-  prohibido.
+  autorizada por el mantenedor**: purgas puntuales — sus SHAs previos, motivos y
+  respaldos están registrados en `docs/archivo/registro-consolidacion.md` (raíz
+  del monorepo, R-15). Cualquier otro caso sigue prohibido.
 
 ## Antes de borrar código que parece muerto
 
@@ -70,11 +80,11 @@ digitalizador de actas E-14 que corre en el navegador del celular; trabaja con
 3. Si el símbolo es ancla de contrato, déjalo exportado y anótalo en
    `docs/DEUDA.md` en vez de tocarlo.
 4. **Lo mismo aplica a `dependencies`**: antes de quitar un paquete de
-   `package.json`, revisa los `peerDependencies` de `@jg-stevan/scanner-ui` y
-   busca el nombre en `node_modules/@jg-stevan/*/dist/`. `framer-motion` no
-   aparece en ningún `import` de `src/`, pero lo consume `ZoomableVisor` del UI
-   package vía peer: quitarlo rompe la pantalla de revisión, y como bun
-   auto-instala peers el build local lo sigue tapando (con npm o pnpm fallaría
+   `package.json`, revisa los `peerDependencies` de los paquetes vendorizados
+   (`src/lib/e14/ui/LEEME.md`) y busca el nombre en `node_modules`. `framer-motion`
+   no aparece en ningún `import` de `src/`, pero lo consume `ZoomableVisor` del
+   árbol UI vendorizado vía peer: quitarlo rompe la pantalla de revisión, y como
+   bun auto-instala peers el build local lo sigue tapando (con npm o pnpm fallaría
    al resolver).
 5. **El motor vive en `packages/scanner-core`, consumido como `workspace:*`**
    (ver su `LEEME.md` y `CHANGELOG.md`). No es un paquete de npm: es un
@@ -82,44 +92,54 @@ digitalizador de actas E-14 que corre en el navegador del celular; trabaja con
    del workspace, no una copia. No lo borres a mano ni lo reinstales con
    npm.
 
-## El motor (`packages/scanner-core`) y la paridad con `supervision-e14`
+## El motor (`packages/scanner-core`) — la paridad es ESTRUCTURAL
 
 **Frase autoridad: el motor vive en `packages/scanner-core`, consumido como
-`workspace:*`** (una sola fuente, sin vendorizado ni npm). Este repo y
-`supervision-e14` (supervisor masivo) comparten el negocio que decide el
-resultado de un acta — `clasificador.ts`, `completitud.ts`, `divipol.ts`,
-`kits.ts`, `integridad.ts`, `marcadores.ts`, `senal-lectura.ts` — y el motor
-de OCR: el MISMO paquete workspace copiado idéntico en los dos repos
-(byte a byte; lo coteja `scripts/qa-paridad-motor.ts` con el hermano en
-disco). Igual de compartidos: el mismo `tesseract.js` con el mismo
-`spa.traineddata`, las mismas ONNX PP-OCRv4, el mismo `divipol.json`. Lo que
-NO se comparte ni se porta: la cola/bandeja/runner del lote (aquí es un
-puesto individual) y el PP-OCRv5.
+`workspace:*`** (una sola fuente, sin vendorizado ni npm — decisión D-monorepo
+del `docs/adr/INDICE.md` raíz). Este repo y `supervision-e14` (supervisor
+masivo) consumen EL MISMO paquete físico: no hay hermano que editar, ni ritual
+de commits espejo, ni cotejo de checkouts (el harness `qa-paridad-motor.ts`
+pre-monorepo se RETIRÓ — la paridad procedural murió con la consolidación).
+Lo que además se comparte entre apps: el mismo `tesseract.js` con el mismo
+`spa.traineddata`, las mismas ONNX PP-OCRv4 y el mismo `divipol.json`.
 
-Editar el motor: cambia el archivo en `packages/scanner-core/src/**` y
-**aplícalo igual en el hermano en el mismo commit** (el paquete es un
-workspace local, no se publica por cada ajuste — el mantenedor decide si/toque
-cuándo publicar a npm; `0.5.0` aún no está publicada). Si solo lo arreglas
-aquí, el golden del hermano se pone rojo con la misma edición pendiente.
+Editar el motor: cambia el archivo en `packages/scanner-core/src/**` (es código
+de ESTE monorepo). Condiciones: (1) regenerar y commitear el golden si el
+cambio toca el clasificador, (2) si el cambio altera la lectura de un acta
+—umbral, recorte, normalización de texto—, pasar los tests del paquete
+(`bun test packages/scanner-core`, que corre en el `verificar` de AMBAS apps).
+Todo comportamiento *nuevo* de producción sigue detrás de un flag de
+`src/lib/e14/flags.ts`.
+
+### El golden del contrato (una sola fuente de verdad)
 
 El contrato vive en `packages/scanner-core/tests/fixtures/contrato-motor.json`
-(21 cabeceras SINTÉTICAS + su salida exacta; enlazado desde
-`src/lib/e14/contrato-motor.test.ts`). Cada repo lo valida contra SU copia
-del motor:
+(21 cabeceras SINTÉTICAS + su salida exacta) y lo valida
+`packages/scanner-core/tests/contrato-motor.test.ts` — corre con
+`bun run test:paquete` (parte de `verificar`).
 
-- `src/lib/e14/contrato-motor.test.ts` (vitest) · `scripts/gen-contrato-motor.ts`
-  (regenera) · `scripts/qa-paridad-motor.ts` (coteja los dos checkouts en
-  disco; «omitido» en CI sin hermano).
-- **Se toca el negocio clasificador y el test pone rojo** → es un cambio de
-  comportamiento REAL: regenera (`bun scripts/gen-contrato-motor.ts`), revisa
-  el diff del golden descriptor por descriptor y cópialo a la misma ruta del
-  hermano. Allí el mismo golden pone rojo hasta que el hermano sincronice el
-  código.
-- **NO se escribe un generador en el hermano**: una sola fuente de verdad, si
-  no cada repo "arregla" su esperado hacia su propio comportamiento y la
-  paridad se vuelve decorativa.
+- **Regeneración de UN paso** (R-02/D-3, auditoría 2026-11-16):
+  `bun scripts/gen-contrato-motor.ts` — escribe DIRECTAMENTE al fixture del
+  paquete (la ruta pre-monorepo `src/lib/e14/__fixtures__/` quedó muerta y se
+  corrigió). `--check` para CI.
+- **Se toca el negocio clasificador y el test del paquete pone rojo** → es un
+  cambio de comportamiento REAL: regenera, revisa el diff del golden descriptor
+  por descriptor y commitea golden + código en el MISMO commit. «Arreglar» el
+  esperado a mano es lo que convertiría el contrato en decorativo.
 - Salida de OCR sobre píxeles, `quad` y `score` NO están en el contrato
   (necesitan navegador/wasm). El `puente/` de envío es exclusivo de este repo.
+
+### Los módulos D-only de ESTA app (CONTRATO md5)
+
+`core/CONTRATO.json` y `ui/CONTRATO.json` fijan el md5 (contenido en LF) de los
+módulos vendoreados de `web-scanner` que viven SOLO aquí (frame-loop,
+motion-stabilizer, pdf-export, pwa, quality, sensor-profiler + ZoomableVisor).
+Desde R-02 (H-02, auditoría 2026-11-16) el guard
+`src/lib/e14/__tests__/contrato-md5.test.ts` los congela dentro de vitest, y el
+regenerador es `bun scripts/gen-contrato-md5.ts` (`--check` para CI). Ritual:
+editar → regenerar → `bun run verificar`. El validador histórico
+(`qa-core-vendorizado.ts`, citado por los LEEME viejos) murió con la
+consolidación — no lo cites como vivo.
 
 ## Estilo
 
@@ -128,37 +148,38 @@ del motor:
 - Muerto = fuera. Sin `_vars`, sin re-exports de compatibilidad, sin comentarios
   describiendo código removido.
 - Un commit pequeño y frecuente vale más que un commit gigante.
-- **El motor sí se puede editar** (es código de este repo:
-  `packages/scanner-core/src/**`, workspace `workspace:*`), con tres
-  condiciones: (1) la misma edición en `supervision-e14` en el mismo commit,
-  (2) regenerar y propagar el golden `contrato-motor.json` si el cambio toca
-  el clasificador, (3) si el cambio altera la lectura de un acta —umbral,
-  recorte, normalización de texto—, pasar además los tests de frontera del
-  paquete (`bun test packages/scanner-core`). Todo comportamiento *nuevo* de
-  producción sigue detrás de un flag de `src/lib/e14/flags.ts`.
+- Los workflows de CI vivos viven SOLO en `.github/workflows/` de la RAÍZ
+  (GitHub jamás ejecutó los anidados en `apps/*/.github/` — R-12, auditoría
+  2026-11-16). Si un gate de esta app debe correr en CI, se lleva a la raíz con
+  `paths-filter`.
 
 ## Dependencias (política de pinning, 6.1.3)
 
 - **Caret por defecto** (`^`) en `dependencies`/`devDependencies`; el lock
   (`bun.lock`) fija el exacto que corre en CI. Excepción: los motores cuyo
   comportamiento es decisión de producto se fijan EXACTOS
-  (`onnxruntime-web 1.30.0`, `tesseract.js 5.1.1`, `zxing-wasm 3.1.6`) —
-  subirlos sin re-medir rompe las decisiones D53/D60/D76.
-- **`bun audit` en CI, semanal** (job programado): dependencias con
-  vulnerabilidad CONOCIDA en paths de BUILD se suben en la misma semana
-  (no es opcional); las de runtime pasan por la regla de arriba (decisión
+  (`onnxruntime-web 1.31.1` — unificado entre las dos apps y el paquete, R-18 —,
+  `tesseract.js 5.1.1`, `zxing-wasm 3.1.6`) — subirlos sin re-medir rompe las
+  decisiones D53/D60/D76.
+- **`bun audit` + gitleaks corren en CI en cada push/PR**
+  (`.github/workflows/ci-seguridad.yml` de la raíz — R-04, auditoría 2026-11-16).
+  Dependencias con vulnerabilidad CONOCIDA en paths de BUILD se suben esa misma
+  semana (no es opcional); las de runtime pasan por la regla de arriba (decisión
   registrada antes de subir un motor).
-- Antes de añadir una dependencia: `AGENTS.md §Privacidad` manda (preguntar
-  primero).
+- Antes de añadir una dependencia: `§Privacidad` manda (preguntar primero).
 
 ## Cómo se lee este repo
 
 Los comentarios citan **kits** (`e14-*`), **decisiones** (`D<n>`) y secciones
-de spec. Las decisiones están en `docs/DECISIONS.md`; los kits y las specs son
-artefactos de sesiones de desarrollo previas que no viajan en el repo, así que
-una mención sin archivo no es un enlace roto. `apps/scanner-lab/…` es el
-laboratorio del repo de ORIGEN del motor (`Jg-Stevan/web-scanner`) — el motor
-VIVO es `packages/scanner-core`.
+de spec. Las decisiones viven en `docs/DECISIONS.md` (de ESTA app) y en
+`apps/supervision-e14/docs/adr/README.md` (del panel — numeración POR REPO, no
+confundir); el guard `adr-resolver.test.ts` del panel exige que toda `D<n>`
+citada en código resuelva en alguno de los dos. Los kits y las specs son
+artefactos de sesiones previas que no viajan en el repo: una mención sin
+archivo no es un enlace roto. Los REPORTE/MEDICION/NOTA fechados viven en
+`docs/archivo/` (H-45). `apps/scanner-lab/…` es el laboratorio del repo de
+ORIGEN del motor (`Jg-Stevan/web-scanner`) — el motor VIVO es
+`packages/scanner-core`.
 
 ## Dónde está qué
 
@@ -168,5 +189,5 @@ capa de dominio de ESTA app (pipeline L2, puente de envío, observabilidad,
 política del gate en `politica/`) · `src/components/e14/` pantallas y hooks
 de cámara (consumen el motor vía `src/lib/e14/fachada.ts` — regla 7.5) ·
 `src/app/` rutas de Next · `scripts/` QA y utilidades de build · `docs/`
-decisiones, arquitectura y reportes de medición. El detalle por módulo está
+decisiones, arquitectura y `archivo/` histórico. El detalle por módulo está
 en `docs/ARQUITECTURA.md`.
