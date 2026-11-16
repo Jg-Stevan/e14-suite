@@ -20,7 +20,10 @@ next-env.d.ts
 public/scanner/capa0-qr.worker.js
 public/vendor/onnxruntime/
 public/vendor/tesseract/
-public/vendor/opencv-4.5.5-core.js
+# R-34 (2026-11-16): el core de OpenCV se materializa con versión en el nombre
+# (hoy 4.12.0; era 4.5.5) — el patrón evita olvidar esta línea en la próxima
+# subida de versión.
+public/vendor/opencv-*-core.js
 public/wasm/zxing_reader.wasm
 public/wasm/zbar.wasm
 public/models/tesseract/*.traineddata.gz

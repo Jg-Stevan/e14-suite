@@ -15,7 +15,8 @@
 #  · `'wasm-unsafe-eval'` + `data:` en connect-src: los motores OCR instancian
 #    WASM y Tesseract compila su core desde una URL data:.
 #  · `'unsafe-eval'`: OBLIGATORIO para el detector — el core self-hosted de
-#    OpenCV (vendor/opencv-4.5.5-core.js, emscripten) usa `new Function` en
+#    OpenCV (vendor/opencv-4.12.0-core.js, emscripten — R-34; el patrón
+#    `new Function`/`makeDynCaller` sigue presente en 4.12.0) usa `new Function` en
 #    `makeDynCaller` (tabla dynCall de WASM) y `createNamedFunction`. Sin
 #    esto importScripts lanza EvalError, el DetectionWorker nunca emite
 #    'ready' y la captura automática queda muerta (regresión 2026-11-11).

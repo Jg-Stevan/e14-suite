@@ -5,8 +5,9 @@
  * copia adaptada al layout de assets de e14 (regla de oro #0: el lab es la
  * fuente de verdad). ADAPTACIONES declaradas:
  *  · VERSION propia (e14-v1) — cachés independientes del lab si coexisten.
- *  · Precache: opencv-4.5.5-core.js vive en /vendor/ (en e14 el wasm va
- *    embebido en el core.js de 8.2 MB — no hay .wasm suelto como el lab).
+ *  · Precache: opencv-4.12.0-core.js vive en /vendor/ (en e14 el wasm va
+ *    embebido en el core.js de 10,4 MB — no hay .wasm suelto como el lab;
+ *    R-34: la ruta versionada invalida el caché viejo del 4.5.5).
  *  · Caché MOTOR (cache-on-first-use): los modelos RapidOCR (/models/
  *    rapidocr/ ≈16 MB) y el runtime ONNX (/vendor/onnxruntime/ ≈14 MB) se
  *    cachean en el PRIMER uso (mismo razonamiento del bloque OCR del lab:
@@ -63,8 +64,10 @@ self.addEventListener("install", (event) => {
           "./icon-512.png",
           "./apple-touch-icon.png",
           // Motor de detección OpenCV offline (PERF-1b del lab — best-effort).
+          // El puente (opencv-4.5.5.js) conserva su nombre legado: lo fija el
+          // worker vendorizado (R-34, ver su cabecera).
           "./vendor/opencv-4.5.5.js",
-          "./vendor/opencv-4.5.5-core.js",
+          "./vendor/opencv-4.12.0-core.js",
           "./scanner/detection-worker.js",
         ]);
       } catch {

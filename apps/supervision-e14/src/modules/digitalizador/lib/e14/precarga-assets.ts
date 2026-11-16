@@ -24,12 +24,16 @@ import { logger } from "../logger";
  */
 
 /** Rutas same-origin de los assets descargables en runtime (sin el prefijo
- *  `public/` del lockfile — las rutas QUE SIRVE la app). El orden es el del
- *  lockfile: primero lo barato (OpenCV ~8 MB), luego el modelo por defecto de
- *  la cascada (Tesseract fast 1,14 MB), después RapidOCR v4 (det/rec/cls) y
- *  el v5 (det/rec) de la escalada. */
+ *  `public/` del lockfile — las rutas QUE SIRVE la app). Solo los destinos
+ *  `public/` del lockfile cuentan (R-34, auditoría 2026-11-16): las entradas
+ *  que viven FUERA de public/ — p. ej. el vendor jsQR de scanner-core, cuyo
+ *  SHA-256 verifica preparar-assets in-place — van bundleadas en el worker
+ *  al compilar, no se descargan en runtime. El orden es el del lockfile:
+ *  primero lo barato (OpenCV ~10,4 MB desde R-34; era ~8 MB con 4.5.5),
+ *  luego el modelo por defecto de la cascada (Tesseract fast 1,14 MB),
+ *  después RapidOCR v4 (det/rec/cls) y el v5 (det/rec) de la escalada. */
 export const RUTAS_PRECARGA_OCR: readonly string[] = [
-  "/vendor/opencv-4.5.5-core.js",
+  "/vendor/opencv-4.12.0-core.js",
   "/models/tesseract/4.0.0_fast/spa.traineddata.gz",
   "/models/rapidocr/ch_PP-OCRv4_det_infer.onnx",
   "/models/rapidocr/ch_PP-OCRv4_rec_infer.onnx",

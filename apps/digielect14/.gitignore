@@ -80,7 +80,10 @@ docs/capturas-*/
 # scripts/assets.lock.json. Nada de esto se versiona.
 public/vendor/onnxruntime/
 public/vendor/tesseract/
-public/vendor/opencv-4.5.5-core.js
+# R-34 (2026-11-16): el core de OpenCV se materializa con versión en el nombre
+# (hoy 4.12.0; era 4.5.5) — el patrón evita olvidar esta línea en la próxima
+# subida de versión (el nombre exacto ya pilló a D88 con las rutas de tessdata).
+public/vendor/opencv-*-core.js
 public/wasm/zxing_reader.wasm
 public/models/tess/*.traineddata.gz
 public/models/tess/*.traineddata

@@ -2,14 +2,15 @@
   "_comentario": "Assets que NO vienen en npm y se descargan al preparar el entorno. Cada entrada fija la URL exacta y el SHA-256 del archivo servido: si el origen devuelve otro contenido, scripts/preparar-assets.mjs detiene el build. Al actualizar un modelo, se sube versión/hash aquí en el mismo commit que cambie el código que lo consume.",
   "_notas": [
     "Los PP-OCRv4 salen del commit fijo 1cfba2e9 de SWHL/RapidOCR (rama main es móvil; el commit no cambia).",
-    "OpenCV es el build oficial de @techstark/opencv-js@4.5.5-release.2, servido por unpkg con la versión fija.",
-    "spa.traineddata.gz sale de naptha/tessdata en un commit fijo: desde D88 (2026-11-10) es 4.0.0_fast (1,14 MB comprimido; descomprime al tessdata_fast oficial de 2,29 MB, sha256 6f2e04d0…), el sabor que clasificó igual que best y tardó 1,5-2,8× menos en el banco on-device. Antes era 4.0.0_best (13,57 MB descomprimido). La RUTA lleva versión (/models/tess/4.0.0_fast/) para invalidar las tres cachés del modelo en equipos ya usados: IndexedDB de tesseract.js, MOTOR_CACHE del SW y HTTP (86400 s)."
+    "OpenCV (R-34, H-41, auditoría 2026-11-16): sube de @techstark/opencv-js@4.5.5-release.2 (build de 2021) a @techstark/opencv-js@4.12.0-release.1 (abril 2025), mismo canal de unpkg con versión fijada — el tarball de npm es inmutable: garantía de reproducibilidad más fuerte que cualquier URL de docs. Fuentes alternativas AGOTADAS con evidencia antes de quedarse con esta: docs.opencv.org/4.12.0/opencv.js y el alias /4.x/ devuelven 403 con challenge JS de Cloudflare en 3 intentos (curl plano, UA de navegador y el UA propio de preparar-assets) — un pipeline no puede resolver el challenge, y el alias /4.x/ además es móvil (rompería el hash en cada release); github.com/opencv/opencv/releases solo publica fuentes, no el js. El sufijo «-core» del destino es HISTÓRICO (así se llamó el archivo materializado en D84): el build techstark es el default COMPLETO de OpenCV.js — verificado en runtime contra la superficie que usa detection-worker.js (adaptCv): 29/29 funciones/constantes presentes (más QRCodeDetector/dnn/calib3d que el repo NO usa) y smoke matFromImageData→cvtColor→GaussianBlur→Canny→dilate→findContours→meanStdDev→Laplacian→getPerspectiveTransform→warpPerspective→addWeighted con los MISMOS números que 4.5.5 (contornos=2, mean=46,67). La RUTA lleva versión (/vendor/opencv-4.12.0-core.js, 10.872.779 B ≈ 10,4 MB; antes 8,2 MB) para invalidar las tres cachés igual que tessdata 4.0.0_fast (D88); el +2,2 MB es el precio de 4 años de OpenCV.",
+    "spa.traineddata.gz sale de naptha/tessdata en un commit fijo: desde D88 (2026-11-10) es 4.0.0_fast (1,14 MB comprimido; descomprime al tessdata_fast oficial de 2,29 MB, sha256 6f2e04d0…), el sabor que clasificó igual que best y tardó 1,5-2,8× menos en el banco on-device. Antes era 4.0.0_best (13,57 MB descomprimido). La RUTA lleva versión (/models/tess/4.0.0_fast/) para invalidar las tres cachés del modelo en equipos ya usados: IndexedDB de tesseract.js, MOTOR_CACHE del SW y HTTP (86400 s).",
+    "jsQR (R-34, H-41, auditoría 2026-11-16 — el hallazgo lo traía «sin versión identificable»): el vendor de scanner-core (../../packages/scanner-core/src/qr/vendor/jsQR.js — red line e63m §9, no se toca) es BYTE-EXACTO del dist oficial de jsqr@1.4.0 en npm (UMD webpack, MIT; 256.885 B, SHA-256 bc40c8a1…, cotejado contra unpkg). Desde R-34 el lock fija versión+URL+hash y preparar-assets VERIFICA el SHA-256 del archivo vendorizado en CADA preparar: si alguien lo edita, el build PARA hasta actualizar el lock a conciencia — la procedencia ahora la verifica el pipeline, no solo los comentarios del d.ts/LEEME. Su destino vive FUERA de public/ a propósito: no es un asset de runtime (el bundler lo incrusta en el worker capa0-qr al compilar), así que no va en ninguna lista de descarga — solo se verifica."
   ],
   "archivos": [
     {
-      "destino": "public/vendor/opencv-4.5.5-core.js",
-      "url": "https://unpkg.com/@techstark/opencv-js@4.5.5-release.2/dist/opencv.js",
-      "sha256": "8c33758c3ed6ead5d6d37837e1a7f2fbf7e21111e7bb9b9c41f3f6d59680e81b"
+      "destino": "public/vendor/opencv-4.12.0-core.js",
+      "url": "https://unpkg.com/@techstark/opencv-js@4.12.0-release.1/dist/opencv.js",
+      "sha256": "bd0c3e6448043de04f6a64a12cb7b759f78c3ab8f7c35c9f2e0f71c88bb17103"
     },
     {
       "destino": "public/models/tess/4.0.0_fast/spa.traineddata.gz",
@@ -30,6 +31,11 @@
       "destino": "public/models/rapidocr/ch_ppocr_mobile_v2.0_cls_infer.onnx",
       "url": "https://huggingface.co/SWHL/RapidOCR/resolve/1cfba2e90fc938db55889873735088de210cc173/PP-OCRv1/ch_ppocr_mobile_v2.0_cls_infer.onnx",
       "sha256": "e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c"
+    },
+    {
+      "destino": "../../packages/scanner-core/src/qr/vendor/jsQR.js",
+      "url": "https://unpkg.com/jsqr@1.4.0/dist/jsQR.js",
+      "sha256": "bc40c8a15196236b2314db0856f72ca0b49980cd5413b8c852a7349f5fee0859"
     }
   ]
 }

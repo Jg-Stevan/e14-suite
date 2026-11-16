@@ -236,7 +236,8 @@ const MIME = {
 //
 // Ola 0-3 (regresión detectada en la prueba en dispositivo 2026-11-11):
 // 'unsafe-eval' es OBLIGATORIO para el detector. El core self-hosted de
-// OpenCV (vendor/opencv-4.5.5-core.js, emscripten) usa `new Function` en
+// OpenCV (vendor/opencv-4.12.0-core.js, emscripten — R-34; `new Function`
+// sigue presente en 4.12.0) usa `new Function` en
 // `makeDynCaller` (tabla dynCall de WASM) y en `createNamedFunction`
 // (errores con nombre). Sin 'unsafe-eval' el importScripts del core lanza
 // EvalError → el DetectionWorker nunca emite 'ready' → el frame loop se

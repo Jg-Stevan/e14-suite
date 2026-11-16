@@ -4,13 +4,14 @@
     "Los PP-OCRv4 salen del commit fijo 1cfba2e9 de SWHL/RapidOCR (rama main es móvil; el commit no cambia).",
     "Los PP-OCRv5 salen de ModelScope con tag v3.9.2 (no expone commit pinneable): el hash fijado es la garantía.",
     "spa.traineddata.gz: baja el .gz publicado de naptha/tessdata en un commit fijo. Desde D88 (2026-11-10) es 4.0.0_fast (1,14 MB comprimido; descomprime al tessdata_fast oficial de 2,29 MB, sha256 6f2e04d0…), el mismo sabor que sirve digielect14 por la paridad del motor. Antes era 4.0.0_best (13.570.187 bytes descomprimido). La ruta lleva versión (/models/tesseract/4.0.0_fast/) para invalidar las tres cachés del modelo: IndexedDB de tesseract.js, MOTOR_CACHE del SW y HTTP (86400 s).",
-    "OpenCV es el build oficial de @techstark/opencv-js@4.5.5-release.2, servido por unpkg con la versión fija."
+    "OpenCV (R-34, H-41, auditoría 2026-11-16): sube de @techstark/opencv-js@4.5.5-release.2 (build de 2021) a @techstark/opencv-js@4.12.0-release.1 (abril 2025), mismo canal de unpkg con versión fijada — el tarball de npm es inmutable: garantía de reproducibilidad más fuerte que cualquier URL de docs. Fuentes alternativas AGOTADAS con evidencia antes de quedarse con esta: docs.opencv.org/4.12.0/opencv.js y el alias /4.x/ devuelven 403 con challenge JS de Cloudflare en 3 intentos (curl plano, UA de navegador y el UA propio de preparar-assets) — un pipeline no puede resolver el challenge, y el alias /4.x/ además es móvil (rompería el hash en cada release); github.com/opencv/opencv/releases solo publica fuentes, no el js. El sufijo «-core» del destino es HISTÓRICO (así se llamó el archivo materializado en D84 del hermano): el build techstark es el default COMPLETO de OpenCV.js — verificado en runtime contra la superficie que usa detection-worker.js (adaptCv): 29/29 funciones/constantes presentes (más QRCodeDetector/dnn/calib3d que el repo NO usa) y smoke matFromImageData→cvtColor→GaussianBlur→Canny→dilate→findContours→meanStdDev→Laplacian→getPerspectiveTransform→warpPerspective→addWeighted con los MISMOS números que 4.5.5 (contornos=2, mean=46,67). La RUTA lleva versión (/vendor/opencv-4.12.0-core.js, 10.872.779 B ≈ 10,4 MB; antes 8,2 MB) para invalidar las tres cachés igual que tesseract 4.0.0_fast (D88 del hermano); el +2,2 MB es el precio de 4 años de OpenCV — la precarga P-23 lo sirve igual (solo cambia la entrada de RUTAS_PRECARGA_OCR y su test de contrato).",
+    "jsQR (R-34, H-41, auditoría 2026-11-16 — el hallazgo lo traía «sin versión identificable»): el vendor de scanner-core (../../packages/scanner-core/src/qr/vendor/jsQR.js — red line e63m §9, no se toca) es BYTE-EXACTO del dist oficial de jsqr@1.4.0 en npm (UMD webpack, MIT; 256.885 B, SHA-256 bc40c8a1…, cotejado contra unpkg). Desde R-34 el lock fija versión+URL+hash y preparar-assets VERIFICA el SHA-256 del archivo vendorizado en CADA preparar: si alguien lo edita, el build PARA hasta actualizar el lock a conciencia — la procedencia ahora la verifica el pipeline, no solo los comentarios del d.ts/LEEME. Su destino vive FUERA de public/ a propósito: no es un asset de runtime (el bundler lo incrusta en el worker capa0-qr al compilar), así que NO va en la precarga P-23 — el test del contrato filtra los destinos public/ del lockfile (los de fuera se verifican, no se descargan)."
   ],
   "archivos": [
     {
-      "destino": "public/vendor/opencv-4.5.5-core.js",
-      "url": "https://unpkg.com/@techstark/opencv-js@4.5.5-release.2/dist/opencv.js",
-      "sha256": "8c33758c3ed6ead5d6d37837e1a7f2fbf7e21111e7bb9b9c41f3f6d59680e81b"
+      "destino": "public/vendor/opencv-4.12.0-core.js",
+      "url": "https://unpkg.com/@techstark/opencv-js@4.12.0-release.1/dist/opencv.js",
+      "sha256": "bd0c3e6448043de04f6a64a12cb7b759f78c3ab8f7c35c9f2e0f71c88bb17103"
     },
     {
       "destino": "public/models/tesseract/4.0.0_fast/spa.traineddata.gz",
@@ -41,6 +42,11 @@
       "destino": "public/models/rapidocr/rec_v5_latin.onnx",
       "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv5/rec/latin_PP-OCRv5_rec_mobile.onnx",
       "sha256": "b20bd37c168a570f583afbc8cd7925603890efbcdc000a59e22c269d160b5f5a"
+    },
+    {
+      "destino": "../../packages/scanner-core/src/qr/vendor/jsQR.js",
+      "url": "https://unpkg.com/jsqr@1.4.0/dist/jsQR.js",
+      "sha256": "bc40c8a15196236b2314db0856f72ca0b49980cd5413b8c852a7349f5fee0859"
     }
   ]
 }

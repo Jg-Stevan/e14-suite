@@ -36,7 +36,7 @@ PP-OCRv4/v5 de modelscope). Cifras en disco tras `preparar`
 | `det_v5_mobile.onnx` | 4.819.576 | Detección v5 (disponible; ya no es default de ALTO). |
 | `rec_v5_latin.onnx` | 7.904.513 | Reconocimiento v5 latino (disponible; ya no es default de ALTO). |
 | `spa.traineddata.gz` | 1.137.561 | Tesseract español 4.0.0_fast (2,29 MB descomprimido; intento 1 de la cascada). |
-| `opencv-4.5.5-core.js` | 8.595.825 | Warp, deskew y rescate QR 4096. |
+| `opencv-4.12.0-core.js` | 10.872.779 | Warp, deskew y rescate QR 4096 (R-34: 4.5.5 → 4.12.0). |
 | `zxing_reader.wasm` | 946.860 | Decodificador QR principal en main. |
 | `zbar.wasm` | 238.653 | Tier zoom complementario. |
 | Núcleos Tesseract (SIMD + fallback) | ~8,0 MB | `public/vendor/tesseract/` (verificado 2026-11-12). |

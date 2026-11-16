@@ -2,10 +2,13 @@
  * P-23 (plan 2026-11-12) — contrato de la PRECARGA de assets OCR.
  *
  *  1) LA LISTA ES UN CONTRATO A DOS BANDAS: `RUTAS_PRECARGA_OCR` debe ser
- *     EXACTAMENTE el destino de `scripts/assets.lock.json` sin el prefijo
- *     `public/` — un modelo nuevo en el lockfile sin precarga paga la
- *     descarga en la primera captura; una ruta muerta en la lista es un 404
- *     silencioso en cada arranque.
+ *     EXACTAMENTE los destinos `public/` de `scripts/assets.lock.json` sin
+ *     el prefijo `public/` — un modelo nuevo en el lockfile sin precarga paga
+ *     la descarga en la primera captura; una ruta muerta en la lista es un 404
+ *     silencioso en cada arranque. (R-34: las entradas del lock que viven
+ *     FUERA de public/ — vendors verificados in-place como el jsQR de
+ *     scanner-core — se excluyen a propósito: se bundleean en el build del
+ *     worker, no se descargan en runtime.)
  *  2) `puedeDescargarAhora` codifica la regla P-23: soloWifi respeta la
  *     recomendación del perfil (wifi o 4g), sin red jamás descarga.
  *  3) La doctrina aceleradora: fire-and-forget — el módulo no puede bloquear
@@ -27,11 +30,15 @@ const RAIZ = join(import.meta.dir, "../../../../../../");
 const leer = (rel: string) => readFileSync(join(RAIZ, rel), "utf8");
 
 describe("precarga-assets — contrato P-23", () => {
-  test("la lista es EXACTAMENTE el lockfile sin el prefijo public/", () => {
+  test("la lista es EXACTAMENTE los destinos public/ del lockfile (R-34)", () => {
     const lock = JSON.parse(leer("scripts/assets.lock.json")) as {
       archivos: Array<{ destino: string }>;
     };
-    const esperadas = lock.archivos.map((a) => a.destino.replace(/^public\//, "/"));
+    // R-34: el lock ahora también fija vendors verificados IN-PLACE (destinos
+    // fuera de public/); la precarga solo cubre lo que la app SIRVE.
+    const esperadas = lock.archivos
+      .filter((a) => a.destino.startsWith("public/"))
+      .map((a) => a.destino.replace(/^public\//, "/"));
     expect([...RUTAS_PRECARGA_OCR].sort()).toEqual([...esperadas].sort());
     expect(RUTAS_PRECARGA_OCR.length).toBe(esperadas.length);
   });
