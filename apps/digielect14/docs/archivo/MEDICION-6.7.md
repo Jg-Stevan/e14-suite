@@ -1,7 +1,7 @@
 # Ventana §6.7 — orden por defecto de motores (C3/C4/C5)
 
 > Estado: **abierta** desde el 2026-11-07 (deploys de C1/C2 live). No se toca
-> el default hasta cerrarla. Decisión registrada en `DECISIONS.md` **D85**.
+> el default hasta cerrarla. Decisión registrada en `../DECISIONS.md` **D85**.
 
 ## 1 · Qué se mide y por qué
 
@@ -77,7 +77,7 @@ sale (cuánto se gastó en el motor que perdió el gate).
 - Si un candidato cumple **falso-acepto = 0** y su `msPorActa` mejora al
   default vigente en **≥ 15 %**, se cambia el **default por configuración**
   (orden de motores = datos; los órdenes históricos viajan inyectados). La
-  decisión se registra como una entrada nueva de `DECISIONS.md`, con la
+  decisión se registra como una entrada nueva de `../DECISIONS.md`, con la
   tabla de números y la fecha del cierre.
 - Si no hay candidato que cumpla, o la mejora es menor al margen, la
   decisión es **no cambiar el default** — también se documenta (con los

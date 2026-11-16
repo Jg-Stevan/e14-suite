@@ -111,7 +111,7 @@ const KNOBS_OCR_POR_TIER: Record<
 
 
 /** KIT e14-ocr-tessbest-v1 — Presupuesto del ESCANEO individual (timeout
- *  del pipeline) por tier. Evidencia (docs/REPORTE-sim-gama-baja-v2.md +
+ *  del pipeline) por tier. Evidencia (docs/archivo/REPORTE-sim-gama-baja-v2.md +
  *  sim-lowend-v3-resultados.json): en mono-hilo 6× el pipeline real
  *  necesita ~125 s y el timeout fijo de 120 s (e67) lo RECHAZABA con score
  *  0.0 justo antes de terminar (P0). ALTO = 120 s byte-idéntico al

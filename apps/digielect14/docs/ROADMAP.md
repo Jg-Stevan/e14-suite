@@ -2,7 +2,7 @@
 
 Trabajo pendiente, ordenado por impacto. La **historia** de lo ya hecho no está
 aquí: vive en `docs/DECISIONS.md` (decisiones `D1…D76`), en los
-`docs/REPORTE-*.md` (evidencia de cada medición) y en `git log`.
+`docs/archivo/REPORTE-*.md` (evidencia de cada medición) y en `git log`.
 
 ## 1. Paridad de resultado con `supervision-e14` (prioridad alta)
 

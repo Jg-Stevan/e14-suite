@@ -94,7 +94,7 @@ canal en el repo. Instrucciones: [docs/DEPLOY.md](docs/DEPLOY.md).
 | [docs/DECISIONS.md](docs/DECISIONS.md) | catálogo de decisiones D1…D7x (la autoridad) |
 | [docs/DEUDA.md](docs/DEUDA.md) | lo que falta, lo bloqueado y lo que NO se debe tocar |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | trabajo pendiente, ordenado |
-| [docs/REPORTE-*.md](docs/) | evidencia de mediciones de cada kit |
+| [docs/archivo/REPORTE-*.md](docs/archivo/) | evidencia de mediciones de cada kit |
 | [SECURITY.md](SECURITY.md) | privacidad de datos electorales y divulgación |
 
 Convención de lectura: los comentarios del código citan **kits** (`e14-*`),

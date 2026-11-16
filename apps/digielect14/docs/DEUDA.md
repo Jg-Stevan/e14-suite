@@ -136,7 +136,8 @@ en CI sale «omitido» porque no hay checkout hermano, y en local exige
   acoplamiento.
 - `docs/` sigue siendo la mayor parte del peso documental (≈450 KB tras la
   limpieza). `DECISIONS.md` (94 KB) y `SPEC-*` (≈99 KB) son la referencia de
-  comportamiento; los `REPORTE-*` son evidencia puntual de cada kit.
+  comportamiento; los `REPORTE-*` (archivados en `docs/archivo/`) son
+  evidencia puntual de cada kit.
 - La bitácora por sesión (`docs/worklog.md`, 528 KB) se retiró del repo: su
   contenido es reconstructible con `git log` + `docs/DECISIONS.md`.
 - El worklog retirado dejaba constancia de unos tokens `ghp_`/`vcp_` pegados en

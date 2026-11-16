@@ -189,7 +189,7 @@ el informe de tiempos por vista; se opera desde `dev/SeccionRastreo.tsx`.
 | quiero… | miro primero |
 |---|---|
 | cambiar qué se considera acta válida | `evaluarGate` + `statusDeScore` + D6/D41 |
-| velocidad de OCR | §4, `adaptacion/plan.ts`, `docs/REPORTE-e14-gama-baja-20s-v1.md` |
+| velocidad de OCR | §4, `adaptacion/plan.ts`, `docs/archivo/REPORTE-e14-gama-baja-20s-v1.md` |
 | que acepte otra imagen/foto rar | `hooks/useSelectorFuente.ts` + F-HEIC del core |
 | identificar mejor la cabecera | `clasificador.ts` + `kits.ts` + `docs/research/PATRON-identificacion-actas-e14.md` + el contrato de §5 (regenerar y propagar el golden) |
 | tocar envío/hub | `puente/*` + `docs/ENDPOINT-REPORTES.md` |

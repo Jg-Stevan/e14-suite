@@ -127,12 +127,12 @@ mismo desenlace con ±1 s de diferencia alrededor de los 120 s del timeout.
 
 | Problema (síntoma del mantenedor/ campo) | Kit que lo resolvió | Evidencia |
 |---|---|---|
-| «Abrió la cámara FRONTAL y no se pudo hacer las pruebas» | F-LENS v5 (facing-primero, saneo de caché venenada, guard de apertura) — PR #117 | `docs/REPORTE-fix-camara-principal-f-lens-v5.md` |
+| «Abrió la cámara FRONTAL y no se pudo hacer las pruebas» | F-LENS v5 (facing-primero, saneo de caché venenada, guard de apertura) — PR #117 | `docs/archivo/REPORTE-fix-camara-principal-f-lens-v5.md` |
 | Foto de 50 MP revienta el decode en gama media/baja (~200 MB bitmap) | F-SENSOR-PROFILER 3 capas de tope (D34): decode 523→98 ms | DECISIONS D34 |
 | UI congelada / «página no responde» | ANALIZANDO event-driven (D18) · detección y OCR en workers · heartbeat en worker aparte (obs) | kits obs + fase lógica |
-| Colgadas en carga masiva | Watchdog D65 + relectura con tope e63g (`RELECTURA_TOPE_MS=45_000`) | `docs/REPORTE-e63g-watchdog-relectura-v1.md` |
+| Colgadas en carga masiva | Watchdog D65 + relectura con tope e63g (`RELECTURA_TOPE_MS=45_000`) | `docs/archivo/REPORTE-e63g-watchdog-relectura-v1.md` |
 | Rechazos falsos por timeout corto (masiva) | `TIMEOUT_MASIVA_MS=120_000` (D48) + watchdog por tier en `gama.ts` (BAJO 105 s) | worklog T4 |
-| App no detecta sus propios recursos | Kit `e14-adaptacion-dispositivo-v1`: perfil profundo + plan por tier + informe IA descargable | `docs/REPORTE-adaptacion-dispositivo-v1.md` |
+| App no detecta sus propios recursos | Kit `e14-adaptacion-dispositivo-v1`: perfil profundo + plan por tier + informe IA descargable | `docs/archivo/REPORTE-adaptacion-dispositivo-v1.md` |
 
 ---
 

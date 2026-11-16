@@ -905,7 +905,7 @@ async function reconocerRapidOcrEscalonado(
   // · margen 8 s: lo que queda por pagar tras el OCR (gate + clasificación +
   //   banda + emisión) antes del watchdog.
   // Respeta la decisión de proyecto «nunca se abandona una pasada a mitad»
-  // (docs/REPORTE-e14-gama-baja-20s-v1): aquí no se aborta nada — se decide
+  // (docs/archivo/REPORTE-e14-gama-baja-20s-v1): aquí no se aborta nada — se decide
   // NO ABRIR la pasada que no cabe. Toda apertura tardía que aun así venciera
   // queda MEDIDA (B1 emite la muestra `vencido: true` desde el watchdog).
   const K_SEGUNDA_COMPLETO = 2.5; // A13: re-OCR 1920 ≈ 2,5× la 1.ª pasada
