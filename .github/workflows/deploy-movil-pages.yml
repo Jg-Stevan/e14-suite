@@ -34,6 +34,23 @@ jobs:
       - name: instalar workspaces (lockfile de la raíz)
         run: bun install --frozen-lockfile
 
+      # R-12 (auditoría 2026-11-16): paso PERDIDO en la consolidación al
+      # monorepo — el deploy anidado original (deploy-cf.yml) derivaba la
+      # versión del SW del SHA del commit ANTES del build; sin esto el SW
+      # servido queda con el fallback «e14-v1» y los clientes no detectan
+      # actualizaciones (la detección la hace ci-programados.yml → frescura).
+      - name: Derivar versión del SW del build (6.6)
+        working-directory: apps/digielect14
+        run: |
+          VERSION="e14-$(git rev-parse --short HEAD)"
+          sed -i "s/const VERSION = \".*\";/const VERSION = \"$VERSION\";/" public/sw.js
+          # El cache-busting `?v=` del detection-worker vive en el FUENTE del
+          # consumidor (packages/scanner-core/src/core/detector-client.ts) —
+          # mismo sed que el deploy anidado original.
+          VQ=$(echo "$VERSION" | md5sum | cut -c1-6)
+          sed -i "s/?v=[0-9]*/?v=$VQ/g" ../../packages/scanner-core/src/core/detector-client.ts
+          echo "VERSION del SW = $VERSION · ?v = $VQ"
+
       - name: build (export estático)
         working-directory: apps/digielect14
         env:

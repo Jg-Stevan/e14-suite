@@ -1,0 +1,94 @@
+# CI programado — e14-suite (R-12, auditoría 2026-11-16)
+#
+# Migración a la RAÍZ de los dos gates de calendario que vivían en los
+# workflows anidados de apps/*/.github/ (que GitHub NUNCA ejecutó — solo corre
+# el .github de la raíz). Hasta esta migración, estos checks declarados en la
+# documentación como "la puerta dura" no corrían en ningún sitio:
+#
+#   1. cabeceras  — verificación semanal de COOP/COEP contra los dominios
+#                   de producción de AMBAS apps (D-35/D80/SEC-3: sin COOP/COEP
+#                   el OCR WASM corre a 1 hilo SIN ERROR VISIBLE). Sin las
+#                   cabeceras, el demo publicado corre a ~218 s por acta.
+#   2. frescura   — sondeo diario de la marca de build servida por Cloudflare
+#                   Pages (la VERSION del Service Worker de digielect14, que
+#                   deploy-movil-pages.yml deriva del SHA del commit). Si el
+#                   deploy sirve una versión vacía/fallback, el SW queda
+#                   congelado en los clientes.
+#
+# Ambos aceptan dispatch manual. Mínimo privilegio: contents: read.
+name: programados — cabeceras COOP/COEP + frescura de deploy
+
+on:
+  schedule:
+    # Lunes 14:00 UTC (09:00 Bogotá) — cabeceras.
+    - cron: "0 14 * * 1"
+    # Diario 06:00 UTC (01:00 Bogotá) — frescura.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cabeceras-coop-coep:
+    name: COOP/COEP de producción (ambas apps)
+    # Solo corre en el calendario de lunes (o dispatch manual).
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 14 * * 1'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: digielect14
+            # Dominio por defecto = demo pública documentada en el README;
+            # override por variable de repo DOMINIO_DIGI.
+            dominio: ${{ vars.DOMINIO_DIGI || 'https://digielect14.pages.dev' }}
+          - app: supervision-e14
+            dominio: ${{ vars.DOMINIO_PANEL || 'https://supervision-e14.pages.dev' }}
+    steps:
+      # Pines por SHA (R-13): un tag re-publicado jamás ejecuta código sin revisión.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: "Verificar COOP/COEP de ${{ matrix.app }}"
+        working-directory: apps/${{ matrix.app }}
+        run: node scripts/verificar-cabeceras.mjs "${{ matrix.dominio }}"
+
+  frescura-deploy:
+    name: Marca de build servida (Pages)
+    # Solo corre en el calendario diario (o dispatch manual).
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 6 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar marca de build servida (Cloudflare Pages)
+        run: |
+          set -euo pipefail
+          CF_URL="https://digielect14.pages.dev/sw.js"
+
+          estado_cf=$(curl -sS -o /tmp/sw-cf.js -w '%{http_code}' "$CF_URL") || estado_cf="sin-respuesta"
+
+          if [ "$estado_cf" != "200" ]; then
+            echo "::error::Cloudflare Pages no sirve sw.js (HTTP: $estado_cf) — $CF_URL"
+            echo "Accionable: revisa el último run de deploy-movil-pages.yml (¿falta CLOUDFLARE_API_TOKEN o falló el deploy?)."
+            exit 1
+          fi
+
+          # Misma regex que el sed de «Derivar versión del SW» en
+          # deploy-movil-pages.yml: si este check deja de extraer la cadena,
+          # el patrón se desalineó.
+          ver_cf=$(sed -n 's/^[[:space:]]*const VERSION = "\(.*\)";.*/\1/p' /tmp/sw-cf.js | head -n1)
+
+          echo "Cloudflare: $ver_cf"
+
+          if [ -z "$ver_cf" ]; then
+            echo "::error::No se pudo extraer la VERSION del sw.js servido."
+            echo "Accionable: el patrón del sed de «Derivar versión» ya no coincide con public/sw.js — alinear workflow y archivo."
+            exit 1
+          fi
+
+          if [ "$ver_cf" = "e14-v1" ]; then
+            echo "::error::El sw.js servido lleva la versión FALLBACK (e14-v1): el paso «Derivar versión del SW» no corrió en el deploy."
+            echo "Accionable: revisa deploy-movil-pages.yml — el build está sirviendo el SW sin marca de build."
+            exit 1
+          fi
+
+          echo "OK: Cloudflare Pages sirve la marca de build «$ver_cf»."

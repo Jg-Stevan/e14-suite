@@ -147,6 +147,7 @@ que nadie reconoce):
 
 ## Monitoreo mínimo del hub (H-6)
 
-Probe diario de `GET /salud` (workflow `frescura-deploys.yml` o Cloudflare
-Health Check) que abre issue si falla. El hub es el activo P0: sin probe, una
+Probe diario de `GET /salud` (workflow `ci-programados.yml` de la raíz del
+monorepo — job `frescura-deploy`, R-12 — o Cloudflare Health Check) que abre
+issue si falla. El hub es el activo P0: sin probe, una
 caída silenciosa deja puestos sin poder enviar sin que nadie lo sepa.

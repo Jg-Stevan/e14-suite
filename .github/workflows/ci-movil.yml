@@ -1,6 +1,22 @@
 # CI de la app móvil — digielect14 (paths-filter: app + motor)
-# NOTA: scaffold. Alinear con el quality.yml del repo viejo (cota bundle 20 MB,
-# smokes byte a byte) si 'verificar' no cubre todo eso.
+#
+# R-12 (auditoría 2026-11-16): este workflow era un SCAFFOLD que admitía no
+# cubrir el gate histórico («Alinear con el quality.yml del repo viejo… si
+# 'verificar' no cubre todo eso»). El quality.yml viejo vivía en el .github
+# ANIDADO de la app — que GitHub NUNCA ejecutó (solo corre el .github de la
+# raíz): los harnesses QA y los smoke byte-a-byte estaban declarados como
+# "la puerta dura" y no corrían en ningún sitio. Esta versión los migra:
+#
+#   1. verificar   — preparar + typecheck + lint + vitest + test:paquete
+#   2. QA          — los 6 harnesses de anclas y contrato (scripts/qa-*.ts;
+#                    el séptimo histórico, qa-paridad-motor, se RETIRÓ: la
+#                    paridad pre-monorepo la sostiene hoy el workspace)
+#   3. smokes      — los 3 workers (heartbeat, capa 0 QR, fallback canvas)
+#                    precompilados y FRESCOS (byte a byte contra su
+#                    regeneración — lección e73: Turbopack emitiendo el .ts
+#                    crudo como asset era un verde falso)
+#
+# El build de producción y su reporte de bundle vive en ci-build.yml (R-35).
 name: ci — movil (digielect14)
 
 on:
@@ -13,19 +29,56 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-movil-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verificar:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # Pines por SHA (R-13): un tag re-publicado jamás ejecuta código sin revisión.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: "1.4.2"
 
       - name: instalar workspaces (lockfile de la raíz)
         run: bun install --frozen-lockfile
 
+      # Los binarios de public/ no se versionan (~25 MB): cache por hash del
+      # lock de assets (migra del quality.yml anidado — cambiar un hash
+      # invalida el cache automáticamente).
+      - name: Cache de assets externos
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            apps/digielect14/public/models/rapidocr/*.onnx
+            apps/digielect14/public/models/tesseract/*.traineddata.gz
+            apps/digielect14/public/vendor/opencv-4.5.5-core.js
+          key: assets-movil-${{ runner.os }}-${{ hashFiles('apps/digielect14/scripts/assets.lock.json') }}
+
       - name: verificar (preparar + typecheck + lint + vitest + test:paquete)
         working-directory: apps/digielect14
         run: bun run verificar
+
+      - name: QA — harnesses de anclas y contrato (scripts/qa-*.ts)
+        working-directory: apps/digielect14
+        run: |
+          fallos=0
+          for f in scripts/qa-*.ts; do
+            echo "── $f"
+            if ! bun "$f"; then
+              echo "::error::QA $f en rojo"
+              fallos=1
+            fi
+          done
+          exit $fallos
+
+      - name: Smoke — workers precompilados y frescos (byte a byte)
+        working-directory: apps/digielect14
+        run: |
+          bun scripts/smoke-heartbeat-worker.mjs
+          bun scripts/smoke-capa0-qr-worker.mjs
+          bun scripts/smoke-fallback-canvas-worker.mjs

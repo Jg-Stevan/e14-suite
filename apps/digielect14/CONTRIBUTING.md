@@ -17,7 +17,7 @@ bun run dev          # :3000 (corre `preparar` antes: vendor + assets)
 bash scripts/check-quality.sh
 ```
 
-Equivalente paso a paso a `.github/workflows/quality.yml`:
+Equivalente paso a paso a `.github/workflows/ci-movil.yml` (raíz del monorepo):
 
 1. `bunx tsc --noEmit` — 0 errores.
 2. `bun run lint` — 0 errores / 0 warnings.

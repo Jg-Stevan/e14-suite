@@ -63,12 +63,17 @@ supervisor masivo, no que el móvil cargue con la cola masiva.
 - [x] `scripts/qa-obs-ui.ts` 8/8 — cerrado el 2026-11-04: el ancla pedía
       «modo de diagnóstico» y el mantenedor lo renombró a «modo desarrollador»; se
       recalibró el harness, no la UI.
-- [x] Correr `scripts/qa-*.ts` dentro de `.github/workflows/quality.yml` —
-      cerrado el 2026-11-04. CI ahora valida tipos + lint + vitest + build +
-      los 2 smoke de worker + los harnesses (7 con `qa-paridad-motor.ts`, que en
+- [x] Correr `scripts/qa-*.ts` en CI — cerrado el 2026-11-04 en el repo
+      pre-monorepo (`quality.yml` anidado, que GitHub JAMÁS ejecutó; los
+      harnesses realmente llegaron a CI con R-12, auditoría 2026-11-16, vía
+      `.github/workflows/ci-movil.yml` de la raíz). CI valida tipos + lint +
+      vitest + build + los smoke de worker + los harnesses (6; el séptimo,
+      `qa-paridad-motor.ts`, se retiró con R-12: paridad estructural. En
       CI sale «omitido» porque el checkout hermano no existe: la paridad en CI
       la sostiene `contrato-motor.test.ts` con el golden commiteado), y `bun`
-      quedó **fijo en 1.4.2** en `quality.yml` y `deploy-cf.yml` (el smoke
+      quedó **fijo en 1.4.2** (hoy en los workflows raíz `ci-movil.yml` y
+      `deploy-movil-pages.yml`; los anidados quality/deploy-cf fueron
+      purgados por R-12 — GitHub jamás los ejecutó) (el smoke
       compara el artefacto commiteado byte a byte y el minificador de bun cambia
       entre versiones).
 - [x] Recalibrar los contadores que citaban cifras viejas: la cabecera de

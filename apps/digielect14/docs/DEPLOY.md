@@ -5,7 +5,7 @@ Next (`BUILD_STATIC=1` → `out/`) o el worker de OpenNext.
 
 | destino | URL | COOP/COEP (multihilo OCR) | cómo se actualiza |
 |---|---|---|---|
-| Cloudflare Pages (canal único) | `digielect14.pages.dev` | ✓ vía `public/_headers` | automático: `deploy-cf.yml` en push a `main` (o dispatch manual) |
+| Cloudflare Pages (canal único) | `digielect14.pages.dev` | ✓ vía `public/_headers` | automático: `deploy-movil-pages.yml` (raíz del monorepo) en push a `main` (o dispatch manual) |
 | Cloudflare Worker | `digielect14e.julistevan02.workers.dev` | ✓ (config del worker) | `bun run deploy` (o Build de la app en el dashboard) |
 
 El canal único es Cloudflare (Pages + Worker): `public/_headers` envía las
@@ -13,7 +13,7 @@ cabeceras cross-origin, `crossOriginIsolated` es `true` y el OCR corre
 multihilo en la raíz del dominio. La demo canónica es `digielect14.pages.dev`.
 
 **Por qué el merge no basta**: ni Pages ni el Worker se disparan solos con el
-push (el deploy automático de Pages es `deploy-cf.yml`, que exige el secreto
+push (el deploy automático de Pages es `deploy-movil-pages.yml` de la raíz, que exige el secreto
 `CF_API_TOKEN`; el Worker no tiene CI propio). Después de mergear hay que
 verificar que el deploy corrió (§3).
 
