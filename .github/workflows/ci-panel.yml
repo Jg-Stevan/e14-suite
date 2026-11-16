@@ -1,6 +1,6 @@
 # CI del panel — supervision-e14 (paths-filter: app + motor)
-# NOTA: scaffold. El panel usa bun:test con bunfig.toml + preload; 'verificar'
-# debe existir en su package.json (si tiene otro nombre, ajusta el paso).
+# El panel usa bun:test con bunfig.toml + preload; el paso 'verificar' de su
+# package.json encadena preparar + typecheck + lint + tests + test:paquete.
 name: ci — supervision (supervision-e14)
 
 on:

@@ -67,19 +67,20 @@ así:
    (`politica/umbrales.ts`) — alias de intención, NO duplicado accidental.
 
 `ignoreDependencies` documentados: `heic2any`, `onnxruntime-web`, `tesseract.js`
-y `zxing-wasm` — importados dinámicamente DENTRO del paquete vendorizado pero
-declarados en la raíz por decisión explícita del ancla T-16 de paridad
-(`scripts/qa-paridad-motor.ts` §"Sus imports DINÁMICOS…"): quitarlos «porque no
-aparecen en ningún import de src/» deja el build verde y revienta el HEIC de un
-iPhone en runtime. `@testing-library/*`: el test de componente está INACTIVO
-por bloqueos documentados (`src/lib/e14/__tests__/review-view.copy.test.ts` y
+y `zxing-wasm` — importados dinámicamente DENTRO del paquete del motor
+(`packages/scanner-core`, mismo workspace) pero declarados en la raíz de la app
+por decisión explícita: quitarlos «porque no aparecen en ningún import de src/»
+deja el build verde y revienta el HEIC de un iPhone en runtime.
+`@testing-library/*`: el test de componente está INACTIVO por bloqueos
+documentados (`src/lib/e14/__tests__/review-view.copy.test.ts` y
 `docs/PENDIENTES-INTEGRACION.md`).
 
-Corregido por R-17 (H-50, auditoría 2026-11-16): este párrafo citaba un
-`e2e/humo.spec.ts` que NO existe en el monorepo (era del repo pre-consolidación
-y dependía de `bunx` temporal). El E2E real del golden path llega con R-36
-(`apps/digielect14/e2e/humo.spec.ts` + playwright.config.ts); cuando llegue,
-`@playwright/test` entra a devDependencies con contrato explícito.
+Actualizado tras R-36 (auditoría 2026-11-16): el E2E del golden path YA EXISTE
+en el monorepo — `apps/digielect14/e2e/humo.spec.ts` (4 casos: carga, cámara
+fake, pipeline ARCHIVO con OCR real, contrato del puente) + `playwright.config.ts`,
+con `@playwright/test` en devDependencies y CI nightly en
+`.github/workflows/ci-e2e.yml`. La cita anterior decía «NO existe… cuando
+llegue» y quedó vencida al aterrizar R-36.
 
 Verificación: `bunx knip` → **exit 0** (63 líneas de avisos warn documentados
 en esta sección) · `bun run lint` → 0 errores · `bunx tsc --noEmit` → 0 errores.

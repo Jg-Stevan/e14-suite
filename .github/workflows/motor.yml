@@ -1,6 +1,6 @@
 # CI del motor — scanner-core (paths-filter: solo cuando cambia el paquete)
-# NOTA: scaffold alineado al plan §6. Revisa los nombres de scripts del package.json
-# del paquete antes del primer push (en el repo viejo era quality.yml parcial).
+# El paquete es runtime-agnostic (bun:test puro): tests + cobertura; el
+# typecheck y lint por app viven en ci-movil/ci-panel vía test:paquete.
 name: motor — scanner-core
 
 on:

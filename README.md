@@ -85,6 +85,20 @@ escaneo de secretos · CI de mínimo privilegio por app + motor + seguridad
 (gitleaks + bun audit). Cada cifra se regenera con el comando de la sección
 «Cómo correr» — nada de esta portada es irreproducible.
 
+## Plan de remediación (2026-11-16)
+
+Las 3 auditorías del ecosistema consolidaron **50 hallazgos → 43 tareas
+accionables + 2 menores absorbidas (H-44/H-45 en R-44)** en 5 sprints, y el
+plan completo se ejecutó: el plan corregido (D-1…D-6) con el estado por tarea
+está en `docs/remediacion/PLAN-REMEDIACION-v2.md` y el informe de ejecución
+con métricas antes→después en `docs/remediacion/INFORME-REMEDIACION.md`.
+Los sprints cubren: estabilización (bug de aliasing, contratos md5,
+toolchain, CVEs), gobernanza documental y CI, observabilidad de errores
+(0 catches sin rastro, guard permanente), refactor estructural (runner 2.887→1.164,
+store en slices, bridge particionado, forks DRY absorbidos) y cierre de
+huecos (build real en CI, E2E de humo, cobertura medida, DIVIPOLA cruzado
+contra la fuente oficial, ADRs de seguridad).
+
 ## Reglas del monorepo
 
 1. El motor se edita SOLO en `packages/scanner-core`; las apps lo consumen por subpath.

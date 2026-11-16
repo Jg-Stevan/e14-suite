@@ -1,6 +1,5 @@
-# Deploy móvil — Cloudflare vía opennextjs-cloudflare
-# REVISAR antes del primer push: alinear con el pipeline actual del repo viejo
-# (comandos exactos de build/deploy pueden diferir). Requiere secrets:
+# Deploy móvil — Cloudflare vía opennextjs-cloudflare (mismo entorno que
+# ci-build.yml valida en cada PR). Requiere secrets:
 #   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID  (ver PENDIENTES-TOKEN.md)
 name: deploy — movil (Cloudflare / opennextjs)
 

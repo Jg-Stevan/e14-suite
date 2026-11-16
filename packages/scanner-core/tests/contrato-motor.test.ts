@@ -1,34 +1,31 @@
 /**
  * Contrato de paridad del motor post-OCR (kit e14-motor-paridad-v1).
  *
- * `digielect14` (móvil, por puesto) y `supervision-e14` (masivo) comparten el
- * motor de OCR (el MISMO código, hoy vendorizado en `src/lib/e14/core/` y byte a
- * byte idéntico al del hermano — ver su `LEEME.md`—, mismo `tesseract.js` con el
- * mismo `spa.traineddata` descomprimido, mismas ONNX PP-OCRv4 y misma base
- * DIVIPOL) y comparten TAMBIÉN el negocio que decide el resultado final:
- * `clasificador.ts`, `completitud.ts` y `divipol.ts`. Este test fija ESE
- * negocio con un golden generado por el motor real
- * (`bun scripts/gen-contrato-motor.ts`), y el hermano tiene el mismo golden con
- * su propia copia de las funciones.
+ * El motor vive UNA vez en `packages/scanner-core` (D-monorepo): ambas apps lo
+ * consumen por subpath `workspace:*` (`@jg-stevan/scanner-core/*`) — ya no
+ * hay copias vendorizadas ni «hermano» que sincronizar. Comparten el MISMO
+ * `tesseract.js` con el mismo `spa.traineddata` descomprimido, las mismas
+ * ONNX PP-OCRv4 y la misma base DIVIPOL, y comparten TAMBIÉN el negocio que
+ * decide el resultado final: `clasificador.ts`, `completitud.ts` y
+ * `divipol.ts`. Este test fija ESE negocio con un golden generado por el
+ * motor real (`bun scripts/gen-contrato-motor.ts`, que escribe directo a
+ * `packages/scanner-core/tests/fixtures/contrato-motor.json`).
  *
- * Por qué un archivo compartido y no ejecutar los dos motores: un CI de un solo
- * repo no puede correr los dos a la vez. Con el golden, la mecánica es —
- *   · cambio de negocio en ESTE repo que altera una clasificación → este test
- *     pone rojo → regenere el golden y cópielo al hermano;
- *   · allí el golden NUEVO pone rojo el test hermano hasta que se sincronice
- *     la misma línea.
- * Es decir: un cambio de negocio se hace dos veces o el contrato lo grita.
+ * Por qué un golden y no ejecutar las dos apps: un CI no puede correr las
+ * dos apps a la vez. Con el golden, la mecánica es —
+ *   · cambio de negocio que altera una clasificación → este test pone rojo
+ *     → regenerar el golden con el generador de un paso y re-correr;
+ *   · el generador exige que el golden nuevo sea estrictamente igual al
+ *     anterior salvo los cambios de negocio revisados (--check para CI).
  *
  * R-16 (auditoría 2026-11-16): `toStrictEqual` desde siempre debió ser la
  * comparación — `toEqual` ignora campos `undefined` y un golden con huecos
  * podía pasar roto. El generador serializa con canon() (claves ordenadas,
  * sin undefined), así que el contrato SANO es estricto por construcción.
- * Regeneración de un paso: `bun scripts/gen-contrato-motor.ts` (desde
- * apps/digielect14 — escribe directo a este fixture; --check para CI).
  *
- * NO cubre (y no pretende): el OCR sobre píxeles (necesita navegador/wasm), el
- * `puente/` (existe solo aquí) ni `quad`/`score` (salida de la cascada, no del
- * clasificador).
+ * NO cubre (y no pretende): el OCR sobre píxeles (necesita navegador/wasm),
+ * el `puente/` (existe solo en digielect14) ni `quad`/`score` (salida de la
+ * cascada, no del clasificador).
  */
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -100,12 +97,13 @@ describe("contrato de motor · clasificación (misma entrada ⇒ mismo resultado
   // El golden se auto-mide con performance.now() (la escalera del score depende
   // del tiempo simulado), así que cada descriptor cuesta 392-602 ms solo. Con el
   // default de 5 s y los 24 workers en isolate, un pico de carga de la máquina lo
-  // hacía TIMED OUT sin que el contrato cambiara: rojo falso. Mismo aire en el
-  // hermano (`__tests__/contrato-motor.test.ts` de supervision-e14).
+  // hacía TIMED OUT sin que el contrato cambiara: rojo falso.
   for (const d of GOLDEN.descriptores) {
     test(`${d.id} — ${d.nota}`, () => {
       expect(clasificarCabecera(d.ocr, BASE)).toStrictEqual(d.esperado);
-      expect(derivadosDe(d)).toEqual(d.derivados);
+      // toStrictEqual también aquí (R-16): el golden se serializa con canon()
+      // sin undefined — un derivado nuevo con hueco grita en vez de pasar.
+      expect(derivadosDe(d)).toStrictEqual(d.derivados);
     }, 30_000);
   }
 });

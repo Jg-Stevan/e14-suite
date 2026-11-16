@@ -8,9 +8,10 @@
 # "la puerta dura" y no corrían en ningún sitio. Esta versión los migra:
 #
 #   1. verificar   — preparar + typecheck + lint + vitest + test:paquete
-#   2. QA          — los 6 harnesses de anclas y contrato (scripts/qa-*.ts;
-#                    el séptimo histórico, qa-paridad-motor, se RETIRÓ: la
-#                    paridad pre-monorepo la sostiene hoy el workspace)
+#   2. QA          — los 8 harnesses de anclas, contrato y a11y
+#                    (scripts/qa-*.ts; el histórico qa-paridad-motor se
+#                    RETIRÓ: la paridad pre-monorepo la sostiene hoy el
+#                    workspace)
 #   3. smokes      — los 3 workers (heartbeat, capa 0 QR, fallback canvas)
 #                    precompilados y FRESCOS (byte a byte contra su
 #                    regeneración — lección e73: Turbopack emitiendo el .ts
