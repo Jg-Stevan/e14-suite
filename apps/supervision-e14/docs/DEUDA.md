@@ -199,3 +199,149 @@ residuales restantes son excepciones documentadas:
   falla en suite, buscar SIEMPRE estado de módulo compartido antes de tocar el
   test. (bun test no tiene --randomize todavía; el orden del readdir del clon
   es el que manda — la regla de beforeEach es la defensa.)
+
+## 11. Accesibilidad (R-38, auditoría 2026-11-16) — registro mínimo
+
+Hueco compartido §6.3 de la auditoría: 0 cobertura de a11y. Tratamiento
+mínimo acordado para el panel: **registro manual, sin script nuevo** —
+verificado el 2026-11-16, `apps/supervision-e14/scripts/` NO tiene
+harnesses `qa-*.ts` (solo `.mjs` de build/parcelación y sus tests), así que
+no hay infra de gate a la que engancharlo. Si el panel adquiere harnesses,
+portar `apps/digielect14/scripts/qa-a11y-contraste.ts` (allí está registrado
+con su modelo y sus perdonados en el DEUDA §9 de ese repo).
+
+### 11.1 Contraste — tokens del tema: TODOS pasan AA
+
+El tema solo-dark de `globals.css` (kit SUP-1 §2.1 + T-01…T-04) es sólido:
+ningún par semántico baja de 5.3:1 (umbral AA texto: 4.5:1). Ratios medidos
+2026-11-16 (WCAG 2.1 sobre las superficies reales):
+
+| Token | Sobre `--background` #0a1314 | Sobre `--card` #0f1c1d | Otros |
+|---|---|---|---|
+| `--foreground` #dee4e3 | 14.61 | 7.82 | — |
+| `--muted-foreground` #bbcbb8 | 11.06 | 10.25 | 9.74 sobre `--surface` · 7.16 sobre hover `--surface-highest` #2b3838 |
+| `--primary` #05f292 | 12.65 | 11.73 | `--primary-foreground` sobre primary: 12.65 |
+| `--amber` #ffb800 (PENDIENTE) | 10.85 | 10.06 | 9.51 sobre chip SCORE `--mz-amber-bg` #261e0b |
+| `--danger` #ff4d4d (CRÍTICO) | 5.75 | 5.33 | 5.48 sobre `--hazard-bg` #241215 (botón REPORTAR/RECHAZAR) |
+| `--neutral-state` #869583 (NO INICIADO) | 5.95 | 5.51 | — |
+| `--error-text` #ff8d87 | — | 7.82 | — |
+
+### 11.2 Hallazgo registrado — grises Tailwind CRUDOS como texto (crítico)
+
+Mismo patrón crítico que el móvil (A11Y-1 del DEUDA de digielect14):
+`text-slate-500` **×22**, `text-gray-500` **×13** y `text-gray-600` **×7**
+usados como texto sobre las superficies oscuras del tema (≈**3.6–4.1:1**,
+bajo el umbral AA de 4.5:1). Concentrados en el módulo digitalizador del
+panel — la MasivaView real del sistema vive aquí, no en el móvil:
+
+- `screens/InformeCorrida.tsx` ×21 (el peor: informe completo en slate-500)
+- masiva/: `bandeja.tsx` ×5 · `barra-lote.tsx` ×4 · `modal-revisor.tsx` ×3 ·
+  `fila.tsx` ×3 · `acelerador.tsx` ×3 · `progreso-lote.tsx`/`helpers.tsx`/
+  `dropzone.tsx` ×1
+
+**Prioridad: crítico** (texto informativo de estado/metadata de lotes bajo
+4.5:1; el modal-revisor lo usa un auditor humano durante horas).
+**Condición de remedio**: migrar a `text-muted-foreground` (#bbcbb8, ≥7.2:1
+en todas las superficies) — es EL token del sistema para texto secundario;
+no inventar gris nuevo. Tras remediar, re-verificar con los ratios de §11.1.
+
+### 11.3 Teclado y táctiles (source-scan rápido)
+
+- **Escape**: cubierto en los 3 diálogos (`acta-viewer-modal` ×4,
+  `modal-revisor` ×5, `supervision-shell` ×4) y toolbar/header de actas.
+- **focus-visible/focus:ring**: presente en 12+ archivos (incluido el
+  catálogo shadcn `button`/`select`/`input`, que aporta anillos base a toda
+  la UI construida sobre él). Pendiente menor: consistencia en tablas densas
+  (`puestos-table`, `mesas-subtable`).
+- **Táctiles 44 px**: ya decidido y vigente en **D7** (ADR README: «targets
+  44 px» dentro de los diez ajustes técnicos) — este registro lo cita, no lo
+  duplica.
+
+## 13. DIVIPOLA — cruce contra la fuente oficial (R-39, auditoría 2026-11-16)
+
+Hueco compartido §6.4 de la auditoría: la consistencia interna del catálogo
+estaba congelada por test (949 puestos · 67 países · 3.670 mesas, exacto al
+dígito — `data/__tests__/catalogo-divipola.test.ts`), pero nadie lo había
+cruzado contra la fuente externa. **Cerrado el 2026-11-16** con
+`scripts/cruzar-divipola.ts` (sin dependencias nuevas; la validación
+estructural importa el MISMO validador del runtime, `domain/divipola.ts`):
+
+- **Qué se cruzó**: los 949 registros de `data/divipola-exterior.json`,
+  campo a campo (idEnlace + los 8 campos), contra la extracción del depto 88
+  (CONSULADOS) del bundle DIVIPOL que sirve el **visor ciudadano E14 2026 de
+  la Registraduría** — la misma fuente de verdad que documenta
+  `apps/digielect14/scripts/gen-divipol.mjs` (SPEC-e14-cabecera §1).
+- **Contra qué exactamente**:
+  `https://e14segundavueltapresidente.registraduria.gov.co/assets/temis/divipol_json/departmentsTree.json`
+  (descargada en vivo; el WAF exige User-Agent de navegador — el script hace
+  fetch con UA + 1 reintento + fallback a curl). Se agotaron además: la
+  DIVIPOLA del DANE en datos.gov.co (`gdxc-w37w` — responde, pero su
+  nomenclatura NO publica consulados: cod_dpto 88 = San Andrés; el exterior
+  es convención E14 de la Registraduría) y el portal
+  `registraduria.gov.co` (403 a clientes no-navegador; sus puestos del
+  exterior son PDFs — referencia humana).
+- **Resultado (2026-11-16)**: **0 diferencias** — catálogo y fuente oficial
+  idénticos registro a registro y en digest canónico
+  (`bbb12832429e32ce…`), con conteos 949/67/3.670 a ambos lados y las
+  validaciones estructurales completas en verde (formato dept(2)_mun(3)_
+  zona(3)_puesto(2), depto "88" en todos, 3.670 pares (idEnlace, mesa)
+  únicos). El snapshot firmado de la referencia quedó en
+  `docs/archivo/divipola-snapshot-oficial.md` (SHA-256 del catálogo +
+  SHA-256 de la extracción oficial + fecha + URLs).
+- **Condición de re-cruce**: correr `bun scripts/cruzar-divipola.ts` —
+  obligatorio si cambia el catálogo versionado (el script sale en rojo por
+  DRIFT contra el snapshot) y al preparar cada release electoral. Si el
+  cruce en vivo está limpio, `--congelar` mueve la referencia. El modo
+  `--congelar` se REHÚSA a firmar si el cruce en vivo da diferencias. Si la
+  fuente oficial deja de responder (WAF/rotación), el gate degrada a
+  detección de drift contra el snapshot (plan B documentado en la cabecera
+  del script).
+
+## 12. Supply chain del sidecar (R-42, auditoría 2026-11-16) — REGISTRADO
+
+Hueco compartido §6.8: el `.exe` PyInstaller que se distribuye en releases
+jamás fue analizado como cadena de suministro. Con **R-08** (pines exactos de
+`native/requirements.txt`, ya aplicado) quedó la mitad — qué ENTRA al build;
+**R-42** cerró la otra mitad — cómo se VERIFICA lo que sale. Estado real:
+
+**Qué quedó verificado (y dónde vive):**
+
+- **Qué entra**: pines exactos de `native/requirements.txt` (R-08) + modelos
+  `.onnx` por URL+SHA-256 de `scripts/assets.lock.json`, materializados en CI
+  por `scripts/preparar-assets.mjs` antes de empaquetar.
+- **Qué verifica el empaquetador solo** (`scripts/empaquetar-sidecar.mjs`):
+  cada `.onnx` del bundle contra el SHA-256 del lock (modo `--sin-ejecutar`
+  del runner), piso de tamaño del bundle (90 MiB onedir) y — en local —
+  arranque real del `.exe` con `GET /salud`.
+- **Qué publica el workflow** (`.github/workflows/sidecar-release.yml`, R-42):
+  `SHA256SUMS.txt` adjunto a la release + al artifact (el hash ya estaba en
+  el cuerpo, pero un cuerpo se edita y un asset se re-sube; ahora hay un
+  archivo estándar `sha256sum -c`), `INVENTARIO-BUNDLE.txt` adjunto (dir
+  recursivo con tamaños: QUÉ `.dll`/`.pyd` viajan dentro de los ~240 MiB —
+  trazabilidad que el log del runner solo guarda 90 días) y el mismo hash en
+  el cuerpo de la release leído del MISMO cálculo (imposible que diverja).
+- **El canal público**: el deploy parte el ZIP con el SHA-256 en los nombres
+  de las partes (`partir-descarga-sidecar.mjs`) — un deploy no puede mezclar
+  partes viejas; `manifiesto.json` expone el hash para verificar descargas.
+
+**El contrato (qué es verificable y qué no):** la reproducibilidad BIT A BIT
+de PyInstaller NO está garantizada por diseño (timestamps de los PEs, rutas
+del runner embebidas, `Compress-Archive` no determinista, y el runner construye
+con Python 3.12 mientras los pines se midieron sobre 3.14.7 — las wheels
+traen DLLs distintas). El contrato verificable es: MISMA fuente (tag) + MISMO
+requirements + **hash publicado del build oficial** — el que se distribuye es
+el que se hashea. Procedimiento completo de verificación y rebuild:
+`native/BUILD-REPRODUCIBLE.md`.
+
+**Qué queda abierto:**
+
+- **Binario sin firmar** (P2 de §2): sigue siendo la vía más realista de
+  compromiso percibido por el visitante (SmartScreen + antivirus). La
+  verificación por SHA-256 de R-42 es el paliativo; el certificado EV de
+  code signing sigue siendo decisión del mantenedor.
+- **Reproducibilidad bit a bit real** (SOURCE_DATE_EPOCH + wheels
+  deterministas): declarado NO perseguido — costo alto, ganancia marginal
+  sobre el contrato actual.
+- **El inventario publicado es del build de CI (Python 3.12)**: un rebuild
+  local con 3.14 no casa tamaños exactos — comparar inventarios, no bytes
+  (detallado en `native/BUILD-REPRODUCIBLE.md` §C).

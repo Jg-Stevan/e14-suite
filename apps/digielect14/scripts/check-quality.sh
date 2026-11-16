@@ -12,12 +12,16 @@
 #                                  «17 archivos · 267 tests» anterior quedó
 #                                  desfasado 164 tests en dos meses)
 #   6. bun scripts/qa-*.ts      → los harnesses de anclas y contrato
-#                                  (aa-invariantes BLOQUEA · aa-cosmeticos
-#                                  avisa · autoenvío · obs-contract ·
+#                                  (a11y-contraste BLOQUEA pares WCAG AA
+#                                  NUEVOS — los ya registrados en DEUDA §9
+#                                  salen WARN perdonados · aa-invariantes
+#                                  BLOQUEA · aa-cosmeticos avisa ·
+#                                  autoenvío · obs-contract ·
 #                                  obs-privacidad · obs-transporte · obs-ui).
-#                                  R-31 separó invariantes de pines
-#                                  cosméticos; R-12 retiró qa-paridad-motor
-#                                  (monorepo = paridad estructural).
+#                                  R-38 añadió a11y-contraste; R-31 separó
+#                                  invariantes de pines cosméticos; R-12
+#                                  retiró qa-paridad-motor (monorepo =
+#                                  paridad estructural).
 #   7. bunx knip                → inventario de dead code (informativo — NO
 #                                  rompe el gate). Los exports de src/lib/e14/obs
 #                                  que knip no ve son anclas de contrato: los
@@ -70,12 +74,14 @@ paso "5/7 · Vitest (suite unitaria)"
 bun run test || fail "vitest"
 ok "vitest verde"
 
-paso "6/7 · Los 7 harnesses de regresión + contrato obs + AA quickwins (QA)"
-# Orden ALFABÉTICO EXACTO del glob scripts/qa-*.ts (los 4 obs-* quedan
-# al final del alfabeto) — NOMBRES[i-1] debe corresponder 1:1
-# con el i-ésimo archivo del glob (kit A3-C5). R-31: aa-quickwins se partió
-# en aa-cosmeticos + aa-invariantes; el cosmético sale 0 (aviso) a propósito.
-declare -a NOMBRES=(aa-cosmeticos aa-invariantes autoenvio obs-contract obs-privacidad obs-transporte obs-ui)
+paso "6/7 · Los 8 harnesses de regresión + contrato obs + AA quickwins (QA)"
+# Orden ALFABÉTICO EXACTO del glob scripts/qa-*.ts (a11y-contraste va
+# PRIMERO: '1' < 'a' en ASCII; los 4 obs-* quedan al final del alfabeto) —
+# NOMBRES[i-1] debe corresponder 1:1 con el i-ésimo archivo del glob (kit
+# A3-C5). R-38 añadió a11y-contraste (perdonados → WARN, ver DEUDA §9);
+# R-31: aa-quickwins se partió en aa-cosmeticos + aa-invariantes; el
+# cosmético sale 0 (aviso) a propósito.
+declare -a NOMBRES=(a11y-contraste aa-cosmeticos aa-invariantes autoenvio obs-contract obs-privacidad obs-transporte obs-ui)
 i=0
 for f in scripts/qa-*.ts; do
   i=$((i+1))
@@ -96,5 +102,5 @@ types_=$(echo "$knip_out" | grep -A100 "exported types" | grep -cE "^[a-zA-Z]" |
 ok "knip: ~${exports_} exports + ~${types_} types sin uso (NO rompe el gate — solo informativo)"
 
 printf '\n\033[1;32m══════════════════════════════════════════════\033[0m\n'
-printf '\033[1;32m TODO VERDE — tsc · lint · build · vitest · QA 7/7\033[0m\n'
+printf '\033[1;32m TODO VERDE — tsc · lint · build · vitest · QA 8/8\033[0m\n'
 printf '\033[1;32m══════════════════════════════════════════════\033[0m\n'

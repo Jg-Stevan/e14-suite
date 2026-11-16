@@ -214,7 +214,12 @@ console.log("— Bloque 4 · invariancias (source-scan) —");
 // implementación directamente del paquete.
 const srcClasificador = await leerImplementacion("../../packages/scanner-core/src/dominio/clasificador.ts");
 const srcTypes = await leerImplementacion("../../packages/scanner-core/src/dominio/types.ts");
-const srcStore = await readFile(new URL("../src/lib/e14/store.ts", import.meta.url), "utf8");
+// R-38 (auditoría 2026-11-16): b9c6861 particionó la tienda dios en slices
+// (store.ts → store/*.ts) y las claves de clasificación migraron al slice
+// analisis.ts — el ANCLA se recalibra al nuevo hogar (mismo criterio del
+// recalibre de qa-obs-ui documentado en docs/DEUDA.md: se recalibra el
+// harness, no la UI).
+const srcStore = await readFile(new URL("../src/lib/e14/store/analisis.ts", import.meta.url), "utf8");
 const srcKits = await leerImplementacion("../../packages/scanner-core/src/dominio/kits.ts");
 const srcEnvio = await readFile(new URL("../src/lib/e14/puente/envio.ts", import.meta.url), "utf8");
 const srcObsTransporte = await readFile(new URL("../src/lib/e14/obs/transporte.ts", import.meta.url), "utf8");

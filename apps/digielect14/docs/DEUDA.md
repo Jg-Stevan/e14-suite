@@ -222,3 +222,132 @@ residuales restantes son excepciones documentadas:
 - Triage: 0 hallazgos → 0 rotaciones. A-05 (reescritura de historia): sin
   secretos conocidos en la historia accesible; la reescritura sigue siendo
   decisión HUMANA (A-05) por si acaso el tramo no cubierto de main.
+
+## 9. Accesibilidad (R-38, auditoría 2026-11-16)
+
+Hueco compartido §6.3 de la auditoría 2026-11-16: **0 cobertura de a11y** en
+una herramienta que usan jurados de votación en mesas de campo (sol, prisa,
+lectura rápida). Este pass **audita y registra — NO es un rediseño**: ningún
+hallazgo de esta sección se remedia aquí; cada uno tiene condición de
+remedio para cuando se decida tocarlo.
+
+### 9.1 Contraste WCAG AA — harness nuevo `scripts/qa-a11y-contraste.ts`
+
+Corre en el gate (paso 6 de `check-quality.sh`). Extrae los pares
+texto/fondo de TODO `src/components/e14/**` (las 5 pantallas + el chrome que
+las viste) y verifica WCAG 2.1: **4.5:1** texto normal · **3:1** texto
+grande (≥24 px, o ≥18.66 px con bold 700+) · **3:1** gráficos/iconos
+(criterio 1.4.11). Modelo: source-scan línea a línea (mismo criterio de
+co-ocurrencia que `qa-aa-invariantes.ts`) + pila de contenedores por
+indentación para los fondos heredados; los alfas (`bg-[#10b981]/15`,
+`text-white/60`) se componen sobre el fondo efectivo. La paleta es la REAL
+de Tailwind v4 en **oklch** (`node_modules/tailwindcss/theme.css`, 4.3.5) +
+los tokens `brand-*` de `globals.css` — ojo al remediar con hexes: el
+`amber-400` de v4 es `#ffb900`, NO el `#fbbf24` de v3.
+
+**Nota de alcance**: la vista `MasivaView` NO existe en el móvil — el módulo
+masiva se retiró (ver `src/lib/e14/store/tipos.ts`) y su homónima vive en el
+panel `supervision-e14` (registrada en el DEUDA de ese repo). Las pantallas
+críticas cubiertas son ESCANEAR (ScanView), ANALIZANDO (AnalyzingView),
+REVISIÓN (ReviewView), ACTAS (ActasView) y RESUMEN (ResumenView).
+
+Corrida 2026-11-16: **152 pares · 136 OK · 16 WARN perdonados · 0 FAIL**.
+Los 16 perdonados están registrados abajo (A11Y-1…A11Y-9) y viven en la
+lista `PERDONADOS` del script con referencia al hallazgo — el gate es VERDE
+hoy y **cualquier par NUEVO bajo el umbral revienta el check**. Cuando un
+perdonado se remedia, el par pasa a OK solo y su entrada queda huérfana
+(inocua): se poda de `PERDONADOS` por higiene.
+
+Prioridades (criterio del plan): **crítico** = contraste < 4.5 en texto
+informativo de la UI de campo · **medio** = foco invisible o icono al límite
+· **bajo** = cosmético, decorativo o fuera de campo.
+
+| ID | Prioridad | Dónde | Par (ratio) | Condición de remedio |
+|---|---|---|---|---|
+| A11Y-1 | **crítico** | ReviewView — chip «capa 0 qr · sin lectura» (sm+) y línea colapsada (móvil) | `text-gray-500` sobre `#10161f` **3.75** y sobre `#090d12` **4.03** | Es el ESTADO de lectura del QR (informativo: distingue «no corrió» de «falló»). Subir a `gray-400` (≈7:1) o `slate-300` en las 4 ocurrencias (chip sm+ `QR ✗`/`sin lectura` y línea móvil `capa 0 qr · sin lectura`). |
+| A11Y-2 | **crítico** | ReviewView — píldora RECHAZADA de la zona fija (motivo del rechazo) | `text-white` sobre `bg-[#ef4444]` **3.76** (11 px bold no alcanza texto grande) | Le dice al jurado que repita la foto. Mismo fix del design system: fondo `#E52222` (crit, blanco 4.58 — patrón ya validado en `PrimaryBtn` crit) o `red-600` (4.83), o subir la píldora a texto grande. |
+| A11Y-3 | **crítico** | Familia badge de error: RESCANEO (ResumenView, badgeEstado) + equivalentes del panel dev | `text-[#ef4444]` sobre su tinte `/15` — **4.19** sobre tarjeta `#10161f` (PanelDev), **4.40** sobre `#0b1117` (VistaErrores); ResumenView real ≈4.19 sobre tarjeta (el script lo mide 4.54 sobre raíz porque el helper `badgeEstado` se define fuera del contexto de la tarjeta — documentado) | Texto de estado con borde fino del mismo tono. Subir el texto a `red-400` (≈5.7 sobre el tinte) manteniendo el borde `ef4444/40`. Al remediar, sacar las 2 claves de `PERDONADOS`. |
+| A11Y-4 | **medio** | primitives — `PrimaryBtn` variante crit: el ICONO usa `toneText.crit` (`#E52222`) sobre el MISMO fondo `#E52222` del botón | icono **1:1** (invisible); el label blanco 4.58 sí pasa | El botón sigue siendo operativo (label legible). Remedio: icono blanco (como el label) en la rama crit de `toneText`. |
+| A11Y-5 | **medio** | TopBar — nube de transmisión (offline/rechazada y online) | icono `red-500` sobre `red-500/20` **4.31** e icono `brand-green` sobre `brand-greendark` **3.83** | SOLO icono (umbral 1.4.11 de 3:1 → **pasan**), pero sin margen y sin texto de refuerzo (tiene `aria-label`+`title`). Si se toca: aclarar a `red-400`/`emerald-300`. |
+| A11Y-6 | **bajo** | Solo modo desarrollador: PanelDev y SeccionRastreo | `text-slate-500` sobre `slate-800/60` **3.52** y sobre `#0b1117` **3.98** | Fuera de la UI de campo (el panel dev no lo usa un jurado). Remedio junto con la próxima limpieza del panel dev. |
+| A11Y-7 | **bajo** (exento) | PanelClasificación — campos de clasificación deshabilitados | `text-gray-500` sobre `brand-surface/50` **3.88** | WCAG 1.4.3 EXIME los controles deshabilitados (`cursor-not-allowed`). Remedio solo si el campo vuelve a ser editable. |
+| A11Y-8 | **bajo** (decorativo) | AnalyzingView — pista del anillo de progreso | `text-slate-800/80` sobre raíz **1.24** (svg `aria-hidden`) | La sutileza de la pista es INTENCIONAL (el dato viaja en el anillo verde, 7.91, y en el texto). Sin remedio; exento como decorativo. |
+| A11Y-9 | **artefacto** del modelo | primitives (`styles` de PrimaryBtn) y ActasView (objetos de datos con `dot:`) | 4 claves con ratio 1.0–1.81 que **no son pares reales**: el fondo vive en OTRA línea (icono ok sobre verde = 7.68 OK) o el peor fondo de la línea es el dot decorativo de otro elemento (chips reales sobre tintes /10–/20 = 5.85–6.8 OK) | Sin remedio. Están perdonados para que el WARN del gate no sorprenda; si el modelo se refinara (parse JSX real), se limpian. |
+
+### 9.2 Navegación por teclado (source-scan)
+
+Cobertura REAL por vista (rg de `Escape`/`onKeyDown`/`focus-visible` en
+`src/components/e14/`):
+
+| Vista/componente | Escape | Enter/Space | focus-visible | Veredicto |
+|---|---|---|---|---|
+| ReviewView | ✓ (cierra visor fullscreen, listener con captura) | ✓ (tarjeta ENVIADA `role=button` con `tabIndex` + Enter/Espacio + `preventDefault`) | ✓ (ring-2 en las 2 tarjetas táctiles) | **completo** |
+| QuadEditor (recorte) | ✓ (cancela; bloqueado mientras aplica) + trap de Tab vía `useDialogFocus` | ✓ (asas operables con flechas, +Shift ×10) | ✓ (×2) | **completo** (diálogo `role=dialog`) |
+| AyudaOverlay | ✓ (hook + listener global) | — (botones nativos) | ✓ | **completo** (`useDialogFocus`: foco inicial, Tab cíclico, retorno de foco) |
+| ScanView | n/a — el menú de modos es UI siempre-visible desde B3 (el efecto Escape del menú §6.3 se eliminó; no hay diálogo) | botones nativos | **✗ — 3 botones de la fila de disparo con `focus:outline-none`**: IMPORTAR y LINTERNA sin NINGÚN indicador de reemplazo (foco invisible), obturador solo cambia borde blanco→verde | **A11Y-10 (medio)**: añadir `focus-visible:ring-2` (patrón ya usado en ReviewView/AyudaOverlay/dev) |
+| AnalyzingView | n/a (sin diálogo) | botón nativo | ✓ (cancelar/contingencia) | aceptable |
+| ResumenView / ActasView / BottomNav / primitives | — | botones nativos | sin anillo explícito PERO **sin `outline-none`** → outline nativo del navegador visible | aceptable (nota: unificar a `focus-visible` si se toca) |
+| GaleriaSimulación (SIM) / PanelClasificación / búsqueda de ActasView | — | nativos | `focus:outline-none` + solo cambio de borde (débil; la búsqueda añade `ring-1` en `:focus`) | **A11Y-11 (bajo)**: indicador solo-borde, sin distinción `focus-visible` |
+| dev/* (PanelDev, VistaErrores, TuercaResumen, SeccionRastreo) | ✓ (PanelDev) | nativos | ✓ (20 anillos) | **completo** |
+
+### 9.3 Táctiles (ya cubierto)
+
+Los targets táctiles de 44 px y los grises ≤12 px YA están bloqueados por
+`scripts/qa-aa-invariantes.ts` desde R-31 (check 1: 0 co-ocurrencias
+gris-500/600 + texto ≤12 px en `src/components/**`; check 3: `min-h-[44px]`
+en el botón REINICIAR JORNADA de ResumenView; check 2: el rojo crit
+`#E52222` solo en `primitives.tsx`, blanco-sobre-rojo 4.58 AA). Este pass
+de R-38 no añade nada ahí — cita y remite.
+
+## 10. Relajación de ESLint (R-43) — estado real y plan de reapertura
+
+La relajación de ESLint con scope que vive en `eslint.config.mjs` (heredada
+del plan de remediación 7.7, paso C1) es transparente pero HASTA HOY no
+estaba registrada aquí. Estado REAL verificado el 2026-11-16:
+
+### 10.1 Reglas relajadas — qué, scope, severidad
+
+| Regla | Scope | Severidad | Justificación histórica |
+|---|---|---|---|
+| `@typescript-eslint/no-explicit-any` | global | **warn** | 7.7/C1: al reactivarla había **0 `any` explícitos en producción** («barato de mantener; tria los avisos que salgan antes de subir a error»). |
+| `@typescript-eslint/no-explicit-any` | `src/lib/e14/politica/**` | **error** | La capa `politica/` (extraída en 7.1–7.2) NACE limpia y se defiende desde el día uno. |
+| `react-hooks/exhaustive-deps` | global | **warn** | 7.7: el bloque por-archivo OFF de **ScanView** (el módulo más grande, 1.239 líneas) se ELIMINÓ — las directivas justificadas quedaron línea a línea y los avisos nuevos «se trian con plan de limpieza, no se silencian a ciegas». Hoy: 12 avisos, todos DELIBERADOS y anotados uno a uno en `docs/QA-TRIAGE-lint.md` (#5–#16: refs estables leídas por `.current` en los hooks de cámara y el side-channel de flags del PanelDev). |
+| `react-hooks/purity` · `react-hooks/refs` · `react-hooks/set-state-in-effect` | global | **off** | Reglas nuevas de `eslint-plugin-react-hooks` 7.1.x del lockfile raíz; mismo criterio que se aplicó en `scanner-lab`. |
+| `@typescript-eslint/no-unused-vars` | global | warn (`argsIgnorePattern: "^_"`) | Los 5 avisos actuales (bridge ×3, `sincronia-pestanas`, test de caracterización) son posteriores al triage de 2026-11-12 — falta triar. |
+| Resto de OFF/warn cosmético (`no-non-null-assertion`, `ban-ts-comment`, `prefer-as-const`, `no-console`, `prefer-const` warn, `no-img-element`, `react/prop-types`, etc.) | global | off/warn | Histórico del andamiaje Next; sin avisos activos hoy salvo los citados. |
+
+### 10.2 Estado actual (verificado 2026-11-16)
+
+- `rg ': any' / 'as any' / any[]` en `src/` (tests incluidos): **0 matches**
+  — 0 avisos de `no-explicit-any` en el lint.
+- `bun run lint`: **0 errores / 19 avisos** = 12 `exhaustive-deps`
+  deliberados (QA-TRIAGE-lint #5–#16) + 5 `no-unused-vars` sin triar
+  (posteriores al cierre) + 2 de artefactos generados en `coverage/` (no se
+  versionan; eslint no respeta .gitignore).
+
+### 10.3 Plan de reapertura gradual (directorio por directorio)
+
+Principio: subir a `error` **empezando por los directorios con 0 avisos
+hoy**, un bloque por PR, sacando el `warn` global solo al final.
+
+1. **Fase 0 (ya hecha)**: `src/lib/e14/politica/**` en `error`.
+2. **Fase 1 — 0 avisos hoy**: `src/app/**`, `src/components/e14/screens/**`,
+   `src/components/e14/{TopBar,BottomNav,SideNav,AyudaOverlay,QuadEditor,PanelClasificacion,GaleriaSimulacion,primitives,icons}.tsx`,
+   `src/lib/e14/{puente,obs,store,adaptacion,rastreo}/**` → subir
+   `no-explicit-any` a `error` por bloque `files:` (riesgo cero: 0 avisos).
+3. **Fase 2 — limpiar los 5 `no-unused-vars`** (`bridge/ocr.ts`,
+   `bridge/pipeline-recorte.ts`, `bridge/protocolo.ts`,
+   `sincronia-pestanas.ts`, test de caracterización) y subir
+   `src/lib/e14/bridge/**` + `src/lib/e14/sincronia-pestanas.ts`.
+4. **Fase 3 — los 12 `exhaustive-deps` deliberados**: o se resuelven
+   (refs estables → `useCallback` con deps reales, o refactor del effect
+   orquestador de `useSesionCamara` — NO trivial, es el corazón del loop de
+   cámara) o se convierten en `eslint-disable` línea a línea con su razón;
+   luego subir `react-hooks/exhaustive-deps` a `error` en
+   `src/components/e14/hooks/**` y `src/components/e14/dev/**`.
+5. **Fase final**: quitar los `warn` globales de ambas reglas y dejar
+   `error` en todo el repo (más `react-hooks/purity`/`refs`/
+   `set-state-in-effect` cuando el plugin 7.1.x estabilice su triage).
+
+Condición de reapertura de cada fase: `bun run lint` y `check-quality.sh`
+verdes tras el cambio (el gate ya corre `eslint .`).
