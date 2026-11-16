@@ -8,6 +8,7 @@ configurarObsBase({
     try {
       return leerModoDev() && leerPolitica().saludEnVivo && leerFlags().telemetriaSalud;
     } catch {
+      // la sonda de salud es diagnóstico dev: ante la duda, OFF — jamás una señal viva falsa
       return false;
     }
   },

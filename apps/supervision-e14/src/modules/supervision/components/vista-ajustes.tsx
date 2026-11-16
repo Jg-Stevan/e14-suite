@@ -65,6 +65,7 @@ function claveAdmin(): string {
   try {
     return window.localStorage.getItem(CLAVE_ADMIN_LS) ?? "";
   } catch {
+    // localStorage bloqueado (modo privado): "" = sin clave — el expurgo autenticado queda simplemente sin configurar, la vista no se tumba.
     return "";
   }
 }
@@ -75,6 +76,7 @@ function fijarClaveAdmin(valor: string): boolean {
     window.dispatchEvent(new Event(EVENTO_ADMIN));
     return true;
   } catch {
+    // false le devuelve la verdad a la UI (no persistió, no sobrevive la recarga) — mismo honestidad que el token: jamás prometer una clave guardada.
     return false;
   }
 }

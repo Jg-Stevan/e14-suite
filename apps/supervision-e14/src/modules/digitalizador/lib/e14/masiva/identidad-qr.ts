@@ -263,6 +263,7 @@ async function zxingDeVentana(
     );
     return resultados[0]?.text ?? null;
   } catch {
+    // una ventana que falla no mata el barrido: null y sigue la siguiente (jamás throw)
     return null;
   }
 }

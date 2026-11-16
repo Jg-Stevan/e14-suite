@@ -72,6 +72,7 @@ export async function permisoLoopbackNativo(): Promise<PermisoLoopback> {
     });
     return estado.state;
   } catch {
+    // Permiso que el navegador no conoce o lanza ⇒ «desconocido»: se trata como legado SIN gate — jamás bloquea el sondeo del sidecar.
     return "desconocido";
   }
 }
@@ -174,6 +175,7 @@ export async function ladoNativoDisponible(timeoutMs = SALUD_TIMEOUT_MS): Promis
       pid = Number.isFinite(Number(j?.pid)) && Number(j?.pid) > 0 ? Number(j?.pid) : null;
     }
   } catch {
+    // Sonda fallida (fetch/JSON): el logger.info de abajo ya deja el rastro «no disponible» — el sidecar es aceleración, no requisito.
     ok = false;
   }
   salud = { url, ok, ms: ahora };
@@ -253,6 +255,7 @@ export async function ocrNativo(dataUrl: string, cap: number): Promise<OcrNativo
       nBoxes: Number(j.nBoxes) || 0,
     };
   } catch {
+    // Sidecar colgado/timeout (45 s) ⇒ null: el caller reintenta con el motor WASM de siempre (doctrina — aceleración, jamás requisito).
     return null;
   }
 }
@@ -351,6 +354,7 @@ export async function actaNativa(dataUrl: string, cap = 1280): Promise<ActaNativ
       totalMs: Number(j.totalMs) || 0,
     };
   } catch {
+    // Ídem ocrNativo: acta-completa fallida ⇒ null y el pipeline JS corre de principio a fin como hoy (docblock — jamás lanza).
     return null;
   }
 }

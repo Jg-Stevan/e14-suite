@@ -25,6 +25,7 @@ function encodePngDataUrl(canvas: HTMLCanvasElement): Promise<string> {
         fr.readAsDataURL(b);
       }, "image/png");
     } catch (e) {
+      // No se traga: el throw síncrono de toBlob se convierte en el rechazo de la promesa — MISMO camino de error que un blob vacío/FileReader roto.
       reject(e instanceof Error ? e : new Error("toBlob falló"));
     }
   });
@@ -240,6 +241,7 @@ export async function procesadaVaciaDataUrl(url: string): Promise<boolean> {
     }
     return oscuras / (TINTA_LADO * TINTA_LADO) < TINTA_FRACCION_MINIMA;
   } catch {
+    // Ante cualquier fallo NO se afirma «vacía» (conservador, §D4): el acta se trata como con tinta y el operador decide.
     return false;
   }
 }

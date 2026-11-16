@@ -11,6 +11,7 @@ configurarObsBase({
     try {
       return leerPolitica().metadatos;
     } catch {
+      // política ilegible ⇒ default del contrato (metadatos ON): la obs no se apaga sola
       return true;
     }
   },

@@ -8,6 +8,7 @@ configurarObsBase({
     try {
       return leerModoDev() && leerPolitica().saludEnVivo && leerFlags().telemetriaSalud;
     } catch {
+      // política/flags ilegibles: muestreo OFF — cero telemetría sin consentimiento verificable
       return false;
     }
   },

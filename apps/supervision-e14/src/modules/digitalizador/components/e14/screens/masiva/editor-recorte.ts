@@ -71,6 +71,7 @@ function encodeJpeg(canvas: HTMLCanvasElement): Promise<string> {
         fr.readAsDataURL(b);
       }, "image/jpeg", 0.92);
     } catch (e) {
+      // el fallo síncrono de toBlob se convierte en rechazo de la promesa — el llamador ya lo maneja
       reject(e instanceof Error ? e : new Error("toBlob falló"));
     }
   });

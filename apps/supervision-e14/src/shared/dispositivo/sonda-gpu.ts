@@ -70,6 +70,7 @@ export async function sonderGpu(
     const score = Math.min(1000, Math.round((ops / ms) * FACTOR_OPS_POR_MS * 10));
     return Number.isFinite(score) ? score : null;
   } catch {
+    // Sonda = evidencia OPCIONAL del tier inferido: null deja las reglas de siempre (conservador) — sin canvas o con canvas roto, nada se tumba en el montaje de MASIVA.
     return null;
   }
 }

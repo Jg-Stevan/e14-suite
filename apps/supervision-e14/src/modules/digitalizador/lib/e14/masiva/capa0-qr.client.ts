@@ -10,6 +10,7 @@ configurarCapa0({
     try {
       return leerFlags().capa0QrWorker;
     } catch {
+      // flags ilegibles ⇒ default ON: sin flags no se desactiva la capa 0 del QR
       return true;
     }
   },

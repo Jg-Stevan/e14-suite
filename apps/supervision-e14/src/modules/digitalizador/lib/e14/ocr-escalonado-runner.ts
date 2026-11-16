@@ -171,6 +171,7 @@ async function escalar(
     try {
       return telemetria ? telemetria.clasificarNivel(texto) : "MANUAL";
     } catch {
+      // gate caído ⇒ MANUAL (nivel neutral): la traza sale, la elección de pasada no cambia
       return "MANUAL";
     }
   };

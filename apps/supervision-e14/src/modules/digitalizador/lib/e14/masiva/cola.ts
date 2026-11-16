@@ -131,6 +131,7 @@ async function dataUrlABlob(dataUrl: string): Promise<Blob | null> {
     if (!res.ok) return null;
     return await res.blob();
   } catch {
+    // dataURL que no parsea ⇒ null: el caller conserva el string — jamás perder la foto
     return null;
   }
 }
@@ -147,6 +148,7 @@ function blobADataUrl(blob: Blob): Promise<string | null> {
       lector.onerror = () => resolve(null);
       lector.readAsDataURL(blob);
     } catch {
+      // FileReader caído ⇒ null: el caller sigue sin foto y sus guards degradan honesto
       resolve(null);
     }
   });

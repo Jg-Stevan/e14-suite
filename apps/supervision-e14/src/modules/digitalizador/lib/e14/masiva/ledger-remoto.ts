@@ -68,6 +68,7 @@ export async function sha256HexDeTexto(
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
   } catch {
+    // hash imposible ⇒ null: el caller salta la red extra (conservador, jamás inventar)
     return null;
   }
 }
@@ -78,6 +79,7 @@ export function origenActual(): string | null {
   try {
     return typeof location !== "undefined" && location.origin ? location.origin : null;
   } catch {
+    // sin location (node/SSR) no hay origen que reportar — null, jamás inventar
     return null;
   }
 }
@@ -169,6 +171,7 @@ export async function vaciarLedgerRemoto(
     }
     return { ok: true };
   } catch {
+    // válvula del mantenedor: la red caída se reporta tipada — el panel la muestra, jamás crashea
     return { ok: false, error: "RED_CAIDA" };
   }
 }

@@ -229,6 +229,7 @@ async function decodeMaster(archivo: Blob): Promise<{ canvas: HTMLCanvasElement;
     ctx.drawImage(img, 0, 0);
     return { canvas, decodeMs: Date.now() - t0 };
   } catch {
+    // decode del master caído (formato raro) ⇒ null: el pre-proceso devuelve el original intacto
     return null;
   }
 }
@@ -246,6 +247,7 @@ function bitmapDeAnalisis(canvas: HTMLCanvasElement): { ancho: number; alto: num
     ctx.drawImage(canvas, 0, 0, w, h);
     return { ancho: w, alto: h, rgba: ctx.getImageData(0, 0, w, h).data };
   } catch {
+    // sin copia de análisis no hay medición de ángulo: null ⇒ el master va sin corregir
     return null;
   }
 }
@@ -276,6 +278,7 @@ async function canvasAJpeg(canvas: HTMLCanvasElement, nombre: string): Promise<F
     if (!blob) return null;
     return new File([blob], nombre, { type: "image/jpeg" });
   } catch {
+    // encode caído ⇒ null: el archivo original sigue su curso sin deskew
     return null;
   }
 }

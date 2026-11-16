@@ -74,6 +74,7 @@ export function idDispositivo(): string {
     window.localStorage.setItem(CLAVE_DISPOSITIVO, nuevo);
     return nuevo;
   } catch {
+    // localStorage caído (privado/iOS/SSR) ⇒ UUID fresco: el rastreo sigue anónimo, jamás lanza (README-KITS §2 regla 4).
     return nuevoUuid();
   }
 }

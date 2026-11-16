@@ -68,6 +68,7 @@ export function prepararCatalogoDivipola(brutos: unknown[]): ResultadoCatalogo {
   try {
     registros = validarCatalogoDivipola(brutos);
   } catch (error) {
+    // No es tragar: C1 convierte el fallo de validación en el RESULT "BLOQUEADA" con su motivo — el módulo jamás lanza y el consumidor decide (cuarentena D25).
     const detalle =
       error instanceof ErrorValidacionDivipola
         ? error.message

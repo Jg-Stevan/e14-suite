@@ -230,6 +230,7 @@ function dataUrlABlob(dataUrl: string): Blob | null {
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
     return new Blob([bytes], { type: m[1] });
   } catch {
+    // base64 corrupto: null y el caller conserva el string — jamás perder la foto
     return null;
   }
 }
@@ -246,6 +247,7 @@ function blobADataUrl(blob: Blob): Promise<string | null> {
       lector.onerror = () => resolve(null);
       lector.readAsDataURL(blob);
     } catch {
+      // FileReader roto: null → el caller sigue sin foto y los guards degradan honesto
       resolve(null);
     }
   });
@@ -375,6 +377,7 @@ export async function leerActaEnRevision(): Promise<Acta | null> {
     if (esSlotActa(registro)) return await materializarActa(registro);
     return registro;
   } catch {
+    // slot ilegible o IDB caído: nada que restaurar — la REVISIÓN arranca vacía
     return null;
   }
 }

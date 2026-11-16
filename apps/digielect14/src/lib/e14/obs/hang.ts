@@ -43,6 +43,7 @@ function visibleAhora(): boolean {
   try {
     return typeof document === "undefined" || document.visibilityState !== "hidden";
   } catch {
+    // document ilegible: asumir visible — jamás inventar un oculto que silencie la detección
     return true;
   }
 }

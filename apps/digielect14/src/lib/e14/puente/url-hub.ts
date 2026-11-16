@@ -32,6 +32,7 @@ export function normalizarHubUrl(cruda: string | null): string | null {
   try {
     url = new URL(cruda);
   } catch {
+    // basura inparseable no es hub: null → el caller cae al hub por defecto (regla S3)
     return null;
   }
   if (url.protocol === "http:") {
@@ -60,6 +61,7 @@ export function esOrigenLocalDe(
       /^172\.(1[6-9]|2\d|3[01])\./.test(host)
     );
   } catch {
+    // origen inparseable: no es LAN — se trata como remoto (https obligatorio)
     return false;
   }
 }

@@ -96,6 +96,7 @@ export function leerModoDev(): boolean {
   try {
     return window.localStorage.getItem(CLAVE_MODO_DEV) === "on";
   } catch {
+    // sin localStorage no hay modo dev: off es el default seguro del contrato
     return false;
   }
 }
@@ -117,6 +118,7 @@ export function leerOverridesFlagsRaw(): string | null {
   try {
     return window.localStorage.getItem(CLAVE_OVERRIDES);
   } catch {
+    // storage caído = clave ausente (null): la memo de flags sigue su camino normal
     return null;
   }
 }
@@ -145,6 +147,7 @@ export function leerOverridesFlags(): Partial<FlagsApp> {
     // `qrZoomTl`: está en la tabla (booleano, misma semántica).
     return sanearConEsquema(o) as Partial<FlagsApp>;
   } catch {
+    // overrides corruptos ⇒ {}: los defaults de flags.json siguen mandando (el kill-switch manual no brickea leerFlags)
     return {};
   }
 }

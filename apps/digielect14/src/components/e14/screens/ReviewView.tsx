@@ -125,6 +125,7 @@ export function ReviewView() {
       downloadBlob(await dataUrlToBlob(foto), nombre);
       setImagenDesc("ok");
     } catch {
+      // el fallo ya sube al botón como estado «err» (feedback local, la revisión sigue)
       setImagenDesc("err");
     } finally {
       window.setTimeout(() => setImagenDesc(null), 1500);

@@ -188,6 +188,7 @@ function resolverMotorDelDispositivo(perfil: PerfilRecursos): ResolucionMotor | 
   try {
     return resolverMotor(perfilMinimoDe(perfil));
   } catch {
+    // El motor es INFORMATIVO (tarjeta/informe): null omite el bloque motorOcr y el OCR sigue corriendo la cascada por defecto — el perfil jamás se tumba.
     return null;
   }
 }
@@ -232,6 +233,7 @@ function diagnosticoJson(
       2,
     );
   } catch {
+    // Si algo del perfil no es serializable, "{}" mantiene la copia funcional (JSON válido aunque vacío) — mejor eso que romper el botón de copiar.
     return "{}";
   }
 }
@@ -303,6 +305,7 @@ export function VistaPerfil() {
         .then(() => toast.success("Diagnóstico copiado al portapapeles (JSON)"))
         .catch(() => toast.error("El navegador denegó el portapapeles — usa RE-DETECTAR y revisa aquí"));
     } catch {
+      // El fallo SÍ sale a la UI (toast) y el diagnóstico completo sigue visible en esta misma vista — la copia es conveniencia, nada se pierde.
       toast.error("No se pudo copiar el diagnóstico");
     }
   };

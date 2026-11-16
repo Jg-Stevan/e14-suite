@@ -374,6 +374,7 @@ async function bitmapDeArchivo(archivo: Blob): Promise<OrigenBitmap | null> {
     const captura = ctx.getImageData(0, 0, canvas.width, canvas.height);
     return { ancho: canvas.width, alto: canvas.height, rgba: captura.data };
   } catch {
+    // HEIC sin conversión o canvas caído ⇒ null (docblock): el detector jamás tumba el desenlace — clasificarOrigen cae a duda honesta.
     return null;
   }
 }
@@ -390,6 +391,7 @@ export async function clasificarOrigenDeArchivo(archivo: Blob): Promise<OrigenVe
     const bitmap = await bitmapDeArchivo(archivo);
     return clasificarOrigen(bitmap, null);
   } catch {
+    // El peor desenlace es un origen null — duda honesta que no bloquea el archivo (docblock): TODO guardado, jamás throw.
     return { origen: null, senales: null };
   }
 }

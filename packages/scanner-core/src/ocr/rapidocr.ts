@@ -169,7 +169,9 @@ async function initReal(): Promise<RapidRuntime> {
   ort.env.wasm.numThreads = hilos;
   try {
     (window as unknown as { __E14_ORT_CONFIG__?: unknown }).__E14_ORT_CONFIG__ = { numThreads: hilos, proxy: true, simd: true };
-  } catch {}
+  } catch {
+    // Hook global de diagnóstico (window falta en node/SSR): sin él el motor corre IGUAL — es solo una ventana de inspección, cero comportamiento.
+  }
   ort.env.wasm.simd = true;
   // KIT e14-optimizacion-v1 (T2, hallazgo #2 de AUDITORIA-e14-v1): proxy=true
   // migra det/cls/rec al worker interno de ORT — la inferencia (9.8-14.3 s)
@@ -262,6 +264,7 @@ const colaOcrActiva = (): boolean => {
   try {
     return colaGlobalOcr();
   } catch {
+    // Flag inyectada por la app rota ⇒ cola OFF (default histórico): el OCR serializa en su propia cola, sin lanzar.
     return false;
   }
 };
@@ -304,6 +307,7 @@ export async function reiniciarMotorOcrSiInactivo(): Promise<boolean> {
     await rapidOcrReiniciar();
     return true;
   } catch {
+    // Reinicio best-effort: cualquier fallo ⇒ false (no reiniciado) — la corrida en curso manda, jamás lanza a la UI (docblock).
     return false;
   }
 }

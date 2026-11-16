@@ -31,6 +31,7 @@ export function hayEntornoNavegador(): boolean {
   try {
     return typeof navigator !== "undefined" && typeof window !== "undefined";
   } catch {
+    // Entorno exótico donde hasta el chequeo de globals revienta: false = tratado como SSR — señales vacías honestas, la detección no rompe nada.
     return false;
   }
 }
@@ -129,6 +130,7 @@ export function recolectarSync(): SenalesSync {
       plataforma: nav.userAgentData?.platform ?? null,
     };
   } catch {
+    // Señal por señal ya es null-honesta; si algo escapa igual (navigator sellado), el bloque vacío degrada cada fila a "no informado" — el panel no se tumba.
     return vacio;
   }
 }
@@ -187,6 +189,7 @@ export function sondearGpu(): CapacidadGpu {
     try {
       webgpu = "gpu" in navigator;
     } catch {
+      // El in-of "gpu" puede lanzar en navegadores endurecidos: false = WebGPU no reportado (WebGL sigue siendo la señal GPU).
       webgpu = false;
     }
     return {
@@ -198,6 +201,7 @@ export function sondearGpu(): CapacidadGpu {
       maxTexturaLado,
     };
   } catch {
+    // Sin GPU sondeable la evidencia muestra "sin WebGL — raster por software probable" como inconcluso — null honesto, no veredicto ni crash.
     return vacio;
   }
 }
@@ -229,11 +233,13 @@ export function sondearRuntime(): CapacidadesRuntime {
     try {
       wasmBasico = WebAssembly.validate(WASM_MAGIC);
     } catch {
+      // validate() LANZA (no solo false) en algunos runtimes: false honesto — la evidencia dirá "no disponible" y el OCR cae al camino sin WASM.
       wasmBasico = false;
     }
     try {
       wasmSimd = WebAssembly.validate(WASM_SIMD);
     } catch {
+      // Ídem SIMD: false honesto — la evidencia reporta "más lento de lo posible" sin tumbar la sonda del runtime.
       wasmSimd = false;
     }
     const sab = typeof SharedArrayBuffer !== "undefined";
@@ -251,6 +257,7 @@ export function sondearRuntime(): CapacidadesRuntime {
       serviceWorker: "serviceWorker" in navigator,
     };
   } catch {
+    // Todas las banderas en false conservador: sin runtime sondeable el OCR corre mono-hilo sin SIMD — el camino que siempre ha funcionado.
     return vacio;
   }
 }
@@ -298,6 +305,7 @@ export async function recolectarAsync(): Promise<SenalesAsync> {
     }
     return { bateriaNivel, bateriaCargando, storageTotalMB, storageUsadoMB, storageLibreMB };
   } catch {
+    // Batería/storage ausentes = mismo caso que iOS/Safari: null honesto que NO condena (§4.4) — el tier se decide con las señales sincrónicas.
     return vacio;
   }
 }
@@ -314,6 +322,7 @@ function diagonalPulgadas(w: number | null, h: number | null, dpr: number | null
     const px96 = Math.sqrt(wPx * wPx + hPx * hPx) / 96; // 96 px CSS = 1 in aprox
     return Math.round(px96 * 10) / 10;
   } catch {
+    // Sin diagonal, detectarForma cae a la heurística UA-only (escritorio por defecto) — jamás inventar pulgadas.
     return null;
   }
 }
@@ -336,6 +345,7 @@ export function detectarForma(sync: SenalesSync): FactorForma {
     }
     return "escritorio";
   } catch {
+    // "desconocido" es un valor legal del chip (—) y de la evidencia ("No determinado") — honesto, no un crash de la detección.
     return "desconocido";
   }
 }

@@ -551,6 +551,7 @@ function ModalRevisorBase({
         setHintEditor("DETECCIÓN SIN ÉXITO — AJUSTA LOS PUNTOS MANUALMENTE");
       }
     } catch {
+      // la detección solo propone: cualquier fallo es el mismo hint honesto y el supervisor ajusta a mano
       setHintEditor("DETECCIÓN SIN ÉXITO — AJUSTA LOS PUNTOS MANUALMENTE");
     } finally {
       setOcupado(null);
@@ -617,6 +618,7 @@ function ModalRevisorBase({
     try {
       zonaRectRef.current = zonaRecorteRef.current?.getBoundingClientRect() ?? null;
     } catch {
+      // rect best-effort: a null, pctDePuntero mide en vivo y el gesto no se pierde
       zonaRectRef.current = null;
     }
   };

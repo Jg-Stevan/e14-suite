@@ -337,6 +337,11 @@ function capturarFrame(video: HTMLVideoElement): string | null {
     // 7.1: CALIDAD_JPEG_REVISION (0.92) desde politica/umbrales.ts.
     return canvas.toDataURL("image/jpeg", CALIDAD_JPEG_REVISION);
   } catch {
+    // el grab del visor es un camino de captura: null → el flujo sigue sin foto de revisión
+    logger.debug("[e14] frame del visor no capturado (canvas/decode falló)", {
+      w: video.videoWidth,
+      h: video.videoHeight,
+    });
     return null;
   }
 }
@@ -588,6 +593,8 @@ function senalHiResDeCanvas(
     const contrastPapel = Math.min(100, ((p95 - p5) * 100) / PAPER_SPREAD_NORM);
     return { sharpnessHi, contrastPapel };
   } catch {
+    // las señales hi-res son informativas del score: 0/0 degrada al comportamiento anterior
+    logger.debug("[e14] señales hi-res del recorte en 0/0 (cálculo falló)", { wSrc, hSrc });
     return { sharpnessHi: 0, contrastPapel: 0 };
   }
 }
@@ -684,6 +691,7 @@ async function calidadDeActa(
       const extra = senalHiResDeCanvas(img, img.naturalWidth, img.naturalHeight);
       return { ...q, ...extra };
     } catch {
+      // doble fallo (recorte y frame): señales 0/0 — el score v2 degrada al comportamiento anterior
       return { ...q, sharpnessHi: 0, contrastPapel: 0 };
     }
   }
@@ -710,6 +718,10 @@ async function esquinasDeActa(foto: string | undefined): Promise<EsquinasActa | 
     ctx.drawImage(img, 0, 0);
     return marcasEsquina(canvas);
   } catch {
+    // sin medida honesta no se condena: null jamás marca recorte (política del kit)
+    logger.debug("[e14] marcas de esquina sin medir (decode/canvas falló)", {
+      foto: foto?.length ?? 0,
+    });
     return null;
   }
 }
@@ -1321,6 +1333,7 @@ async function ocrBandaInferior(fotoProcesada: string): Promise<string> {
     ctx.drawImage(img, x0, y0, w, h, 0, 0, w * 2, h * 2);
     return await reconocerRapidOcr(canvas.toDataURL("image/jpeg", CALIDAD_JPEG_ENVIO));
   } catch {
+    // la franja del pie es señal extra: "" no condena — el gate decide con lo que ya leyó
     return "";
   }
 }
@@ -1341,6 +1354,7 @@ async function esperarWorkerCaliente(topeMs: number): Promise<boolean> {
       new Promise<boolean>((res) => setTimeout(() => res(false), topeMs)),
     ]);
   } catch {
+    // worker muerto o SSR: false → continuar como hoy, el fallback Sobel manda
     return false;
   }
 }
@@ -1840,6 +1854,7 @@ export class RealCoreBridge implements E14Bridge {
       quad = detalle.quad;
       quadOrigen = detalle.origen;
     } catch {
+      // sin detección sobre la foto nueva: quad identidad — la foto entera es el acta (degradación honesta)
       quad = defaultQuad();
     }
     // 2) Pipeline de RECORTE existente sobre la foto nueva (calidad + OCR +
@@ -2229,6 +2244,7 @@ export class RealCoreBridge implements E14Bridge {
           },
         });
       } catch {
+        // el diagnóstico es metadato aditivo: si su construcción falla, el acta ya está resuelta — diag null
         diag = null;
       }
     }

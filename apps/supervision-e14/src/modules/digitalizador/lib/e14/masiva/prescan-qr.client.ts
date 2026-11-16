@@ -163,6 +163,7 @@ export function crearClientePrescan(): ClientePrescan {
       try {
         w = fabrica(WORKER_URLS[urlIdx] ?? WORKER_URLS[0]!);
       } catch {
+        // worker que no nace ⇒ este boot falla: listo() prueba la siguiente URL
         fin(false);
         return;
       }
@@ -283,6 +284,7 @@ export function crearClientePrescan(): ClientePrescan {
           try {
             w.postMessage(msg, transfer); // bitmap SIEMPRE transferido
           } catch {
+            // postMessage roto (transfer inválido): hard-kill + null — la fila sigue sin prescan
             terminarWorker();
             terminar(null);
           }

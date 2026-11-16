@@ -243,6 +243,7 @@ async function zxingDeVentana(
     );
     return resultados[0]?.text ?? null;
   } catch {
+    // Una ventana podrida no mata el barrido ⇒ null y sigue la siguiente; el wasm caído ya dejó su warn en moduloZxingDe (jamás throw).
     return null;
   }
 }

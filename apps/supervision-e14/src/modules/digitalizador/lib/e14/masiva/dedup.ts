@@ -97,6 +97,7 @@ function dhashDeBitmap(fuente: FuenteBitmap): string | null {
     }
     return hex;
   } catch {
+    // medición best-effort: null = sin señal de dedup y la fila procesa normal (conservador)
     return null;
   }
 }
@@ -111,6 +112,7 @@ export async function dhash64DeDataUrl(dataUrl: string): Promise<string | null> 
     const blob = await (await fetch(dataUrl)).blob();
     return dhashDeBitmap(await bitmapNormalizado(blob));
   } catch {
+    // decode caído ⇒ null: sin hash perceptual no hay dedup y el flujo sigue igual
     return null;
   }
 }
@@ -150,6 +152,7 @@ export async function dhashDeArchivo(file: File): Promise<string | null> {
       : file;
     return dhashDeBitmap(await bitmapNormalizado(fuente));
   } catch {
+    // fallo de decode/HEIC ⇒ null: la fila procesa normal — el dedup por contenido es opcional
     return null;
   }
 }
@@ -171,6 +174,7 @@ export async function hashBytesDeArchivo(file: File): Promise<string | null> {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
   } catch {
+    // subtle/file caído ⇒ sin llave exacta: la fila encola normal, jamás tumba la ingesta
     return null;
   }
 }

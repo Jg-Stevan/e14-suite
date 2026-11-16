@@ -64,6 +64,7 @@ function nombreYMensaje(err: unknown): { nombre: string; mensaje: string } {
   try {
     return { nombre: "", mensaje: String(err) };
   } catch {
+    // entrada hostil que ni String() tolera: vacío → el clasificador cae a ERROR_DESCONOCIDO
     return { nombre: "", mensaje: "" };
   }
 }

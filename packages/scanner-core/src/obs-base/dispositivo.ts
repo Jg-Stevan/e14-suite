@@ -60,6 +60,7 @@ async function bateriaDe(n: Navigator): Promise<{ nivel: number | null; cargando
     const b = await nav.getBattery();
     return { nivel: b.level, cargando: b.charging };
   } catch {
+    // getBattery rechazó (permiso/navegador viejo) ⇒ null honesto: sin dato la batería NO condena el tier (§4.4, jamás inventar).
     return { nivel: null, cargando: null };
   }
 }
@@ -90,6 +91,7 @@ export function redActual(): { tipo: string | null; downlinkMbps: number | null 
     const r = redDe(nav);
     return { tipo: r.tipo, downlinkMbps: r.downlinkMbps };
   } catch {
+    // El sello de red del envío es diagnóstico puro: cualquier fallo ⇒ null y el registro sigue sin sello — jamás lanza (docblock).
     return null;
   }
 }
@@ -101,6 +103,7 @@ async function storageLibreMB(): Promise<number | null> {
     if (typeof e.quota !== "number" || typeof e.usage !== "number") return null;
     return Math.round((e.quota - e.usage) / 1048576);
   } catch {
+    // storage.estimate ausente/roto ⇒ null honesto: sin dato el storage no condena el tier (§4.4).
     return null;
   }
 }
@@ -219,6 +222,7 @@ function condicionesOk(): boolean {
     // (default true → idéntico sin overrides; D6: nunca se auto-configura).
     return configObsBase.condicionesSalud();
   } catch {
+    // Config caída ⇒ false: sin condiciones conocidas el muestreo queda OFF — el diagnóstico jamás se auto-activa (D6).
     return false;
   }
 }

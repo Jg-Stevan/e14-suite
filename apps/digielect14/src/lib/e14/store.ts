@@ -405,6 +405,8 @@ async function derivarMesasConDivipol(
     if (!total) return null;
     return derivarMesas(archivadas, puesto, total);
   } catch {
+    // sin base DIVIPOL legible: null — el caller conserva el guion que ya tiene
+    logger.debug("[e14] guion sin refrescar (DIVIPOL ilegible)", { puesto: puesto.clave });
     return null;
   }
 }
@@ -1300,6 +1302,7 @@ export const useE14Store = create<E14Store>((set, get) => {
             try {
               return await bridge.escanearActa(opcionesEscaneo);
             } catch (errSegundo) {
+              // segundo fallo: ya emitido a obs — se relanza al catch externo que monta MEMORIA_AGOTADA
               void emitirSesionFallida(errSegundo, false);
               throw errSegundo;
             }
@@ -1776,6 +1779,8 @@ export const useE14Store = create<E14Store>((set, get) => {
         // El feedback persistente es la PROPIA foto re-velada + el chip del
         // filtro activo en el sheet (§4.3 del redesign-stitch — sin toast).
       } catch {
+        // el revelado es un preview: al fallar, el acta conserva la foto y el filtro anterior
+        logger.debug("[e14] revelado del filtro falló — la foto anterior queda", { filtro });
         set({ actaActual: actaActual });
       } finally {
         set({ revelando: false });

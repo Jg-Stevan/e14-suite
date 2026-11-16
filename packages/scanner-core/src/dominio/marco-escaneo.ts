@@ -202,6 +202,7 @@ async function bitmapDeDataUrl(
     ctx.drawImage(img, 0, 0, w, h);
     return { ancho: w, alto: h, rgba: ctx.getImageData(0, 0, w, h).data };
   } catch {
+    // Decode/canvas fallido ⇒ null (contrato del docblock): el marco jamás tumba el pipeline — arriba cae a «no-encontrado».
     return null;
   }
 }
@@ -215,6 +216,7 @@ export async function evaluarMarcoImpreso(dataUrl: string): Promise<MarcoEscaneo
     if (!bm) return { veredicto: "no-encontrado", rect: null };
     return evaluarMarcoDeBitmap(bm.ancho, bm.alto, bm.rgba);
   } catch {
+    // Cualquier fallo ⇒ «no-encontrado»: el gate del marco NO bloquea — lectura/score deciden como siempre (docblock T2.1).
     return { veredicto: "no-encontrado", rect: null };
   }
 }

@@ -128,6 +128,7 @@ function wakeLockApi(): NonNullable<NavigatorConWakeLock["wakeLock"]> | null {
     if (!api || typeof api.request !== "function") return null;
     return api;
   } catch {
+    // la sonda de API falló: null = no-op (la pantalla puede dormir, la app sigue)
     return null;
   }
 }
@@ -238,6 +239,7 @@ export function useWakeLock(activo: boolean): void {
         anotar(true, reAdquisicion);
         trazar(reAdquisicion ? "adquirido (re-adquisición)" : "adquirido");
       } catch (error) {
+        // el wake lock es best-effort: fallos de entorno en silencio, el resto a warn — la captura sigue
         registrarFallo(error);
       }
     };

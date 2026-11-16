@@ -838,6 +838,7 @@ export async function listarCorridasMetricas(): Promise<CorridaMetrica[]> {
       rq.onerror = () => reject(rq.error ?? new Error("IDB_METRICAS_CORRIDAS"));
     });
   } catch {
+    // IDB caído ⇒ historial vacío honesto: el informe abre igual (las métricas jamás tumban la UI)
     return [];
   }
 }
@@ -856,6 +857,7 @@ export async function metricasDeCorrida(corridaId: string): Promise<MetricaActa[
       rq.onerror = () => reject(rq.error ?? new Error("IDB_METRICAS_ACTAS"));
     });
   } catch {
+    // IDB caído ⇒ sin historial de esa corrida: vacío honesto, el informe abre igual
     return [];
   }
 }
@@ -921,6 +923,7 @@ export async function exportarInformeMetricas(): Promise<string> {
     const g = planGamaActual();
     gama = { tier: g.tier, tierEfectivo: g.tierEfectivo };
   } catch {
+    // gama ilegible ⇒ ausente honesto: el informe se exporta igual (campo aditivo)
     gama = null;
   }
   const motor = motorOcrActual(); // getter puro del módulo — jamás lanza

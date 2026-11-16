@@ -72,6 +72,7 @@ function cargar(): HistorialRastreo {
     }
     return p;
   } catch {
+    // historial corrupto o storage hostil: se arranca vacío — el rastreo vuelve a medir desde cero
     return vacio();
   }
 }
@@ -407,6 +408,7 @@ export function activarRastreo(): SesionRastreo | null {
     persistir(true);
     return sesion;
   } catch {
+    // activar es best-effort del panel dev: null = sigue OFF, la digitalización no se entera
     return null;
   }
 }
@@ -490,6 +492,7 @@ export function sesionesCerradas(): SesionRastreo[] {
   try {
     return cargar().cerradas;
   } catch {
+    // historial ilegible: lista vacía — el panel muestra «sin sesiones»
     return [];
   }
 }

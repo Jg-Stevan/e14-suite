@@ -92,6 +92,7 @@ export function useLinterna({ streamRef, camEstado, mostrarAviso }: UseLinternaP
       }
       return aplicado;
     } catch {
+      // el torch es un extra del hardware: false → la UI enseña el hint y se captura sin LED
       return false;
     }
   }, []);

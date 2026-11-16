@@ -87,6 +87,7 @@ export function capturarFrame(video: HTMLVideoElement): string | null {
     ctx.drawImage(video, 0, 0);
     return canvas.toDataURL("image/jpeg", 0.92);
   } catch {
+    // grab best-effort del <video> vivo: null = sin captura y el bridge ya lo reporta explícito
     return null;
   }
 }

@@ -31,6 +31,7 @@ configurarPlan({
         navigator.hardwareConcurrency || 1,
       );
     } catch {
+      // señales ilegibles ⇒ 1 hilo: el OCR sale lento pero seguro — jamás cae por config
       return 1;
     }
   },
@@ -41,6 +42,7 @@ configurarColaGlobalOcr(() => {
   try {
     return leerFlags().ocrColaGlobal;
   } catch {
+    // flags ilegibles ⇒ default OFF: sin cola global queda el comportamiento histórico
     return false;
   }
 });

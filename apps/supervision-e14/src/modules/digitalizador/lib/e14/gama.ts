@@ -355,6 +355,7 @@ function señalesSync(): SeñalesGama | null {
         (globalThis as { crossOriginIsolated?: boolean }).crossOriginIsolated === true,
     };
   } catch {
+    // sonda del navegador: null = señales ausentes y planGamaActual cae al plan base inerte
     return null;
   }
 }
@@ -481,6 +482,7 @@ export async function refrescarPlanGama(): Promise<PlanGama> {
     );
     return plan;
   } catch {
+    // refinamiento best-effort: cualquier fallo deja el plan sync ya cacheado — la app jamás se queda sin plan
     return planGamaActual();
   }
 }
@@ -501,6 +503,7 @@ export function flagsMasivaEfectivos(): FlagsApp {
     try {
       manuales = new Set(Object.keys(leerOverridesFlags()));
     } catch {
+      // overrides ilegibles ⇒ conjunto vacío: sin manuales que proteger, aplica el camino por defecto
       manuales = new Set();
     }
     const aplicables: Partial<FlagsApp> = {};

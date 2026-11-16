@@ -49,6 +49,7 @@ function medidaCpu(): number | null {
     if (ms <= 0 || !isFinite(acc)) return null;
     return Math.round((rondas * (datos.length / 4)) / ms); // ops/ms
   } catch {
+    // Fase CPU opcional (evidencia, no veredicto — D6): null = fila "no informado" y el score mezcla solo las fases que sí corrieron.
     return null;
   }
 }
@@ -66,6 +67,7 @@ function medidaMemoria(): number | null {
     const mb = (a.byteLength / 1048576) * copias;
     return Math.round(mb / (ms / 1000)); // MB/s
   } catch {
+    // Ídem fase memoria: es evidencia — null honesto deja la fila "no informado" y el score pondera las fases restantes.
     return null;
   }
 }
@@ -92,6 +94,7 @@ function medidaRaster(): number | null {
     void canvas.toDataURL("image/png", 0.5);
     return Math.round(ms * 100) / 100;
   } catch {
+    // Ídem fase raster: canvas/toDataURL puede fallar en entornos endurecidos — null honesto, el score sigue con CPU/memoria.
     return null;
   }
 }
@@ -118,6 +121,7 @@ function scoreDe(cpuOpsMs: number | null, memMBs: number | null, rasterMs: numbe
     const mezcla = partes.reduce((acc, p, i) => acc + p * pesos[i], 0) / total;
     return Math.max(1, Math.min(1000, Math.round(mezcla * 1000)));
   } catch {
+    // Sin score el panel muestra "Fases insuficientes para puntuar" y el tier se queda con las señales (§4.4) — el benchmark no decide v1.
     return null;
   }
 }
@@ -152,6 +156,7 @@ export async function ejecutarBenchmark(): Promise<BenchmarkResultado> {
     else nota = "Rendimiento medido: bajo";
     return { ejecutado: true, score, cpuOpsMs, memMBs, rasterMs, duracionMs, nota };
   } catch {
+    // Degradación total del benchmark: se reporta "sin ejecutar" y el perfil sigue mostrando señales/tier — la medición jamás tumba la app.
     return { ...BENCHMARK_SIN_EJECUTAR, nota: "El benchmark falló en silencio (jamás tumba la app)" };
   }
 }

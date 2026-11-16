@@ -250,6 +250,7 @@ function gateSeguro(deps: DepsOcrCascada, texto: string): NivelGate {
   try {
     return deps.clasificarNivel(texto);
   } catch {
+    // Clasificador del caller roto ⇒ «MANUAL» conservador: el acta cae a revisión humana — jamás AUTO por omisión.
     return "MANUAL";
   }
 }
@@ -262,6 +263,7 @@ async function ocrRoiSeguro(
   try {
     return await deps.ocrRoi(roiDataUrl);
   } catch {
+    // OCR del ROI fallido ⇒ null: el rescate queda descartado y la cascada elige entre las pasadas sanas (docblock).
     return null;
   }
 }

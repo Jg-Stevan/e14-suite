@@ -92,6 +92,7 @@ export function leerModoDev(): boolean {
   try {
     return window.localStorage.getItem(CLAVE_MODO_DEV) === "on";
   } catch {
+    // localStorage bloqueado: modo dev es opt-in — OFF es el default de producción
     return false;
   }
 }
@@ -252,6 +253,7 @@ export function leerOverridesFlags(): Partial<FlagsApp> {
     // exclusivos de la cola se retiraron junto con el módulo.
     return limpio;
   } catch {
+    // overrides corruptos o ilegibles: {} — mandan los defaults de flags.json
     return {};
   }
 }

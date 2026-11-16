@@ -177,6 +177,7 @@ function leerNumero(clave: string): number {
     const v = Number(window.localStorage.getItem(clave) ?? "0");
     return Number.isFinite(v) && v > 0 ? v : 0;
   } catch {
+    // Sin localStorage el cursor vuelve a 0 y el drenaje re-trae desde la seq 1: publicar es idempotente (merge por idEnlace::mesa) — ni se pierde ni se duplica.
     return 0;
   }
 }
@@ -398,6 +399,7 @@ export async function sincronizarHubLocal(
     notificar();
     return { publicas, bloqueadas, error: null };
   } catch (e) {
+    // El fallo del sondeo se convierte en ESTADO visible (ultimoError/fallosSeguidos en la tarjeta) y a los 5 seguidos el sondeo se autodetiene — el panel sigue.
     estado.ultimoError = e instanceof Error ? e.message : "fallo de red";
     fallosSeguidos += 1;
     estado.fallosSeguidos = fallosSeguidos;
@@ -442,6 +444,7 @@ export async function reiniciarHubRemoto(
     const r = await sincronizarHubLocal(fetchComo);
     return { ok: true, generacion: cuerpo.generacion ?? null, error: r.error };
   } catch (e) {
+    // El reset es una acción manual de demo: el fallo viaja como Result ok:false que la tarjeta muestra — el clic jamás revienta hacia la UI.
     return {
       ok: false,
       generacion: null,
@@ -491,6 +494,7 @@ export function iniciarHubLocal(): void {
   try {
     guardado = window.localStorage.getItem(CLAVE_ACTIVO) ?? "off";
   } catch {
+    // Sin localStorage no sabemos si quedó "on": se queda APAGADO (default — en Pages no hay hub y sondear en vacío es ruido); se prende desde la tarjeta.
     return;
   }
   if (guardado !== "on") return;

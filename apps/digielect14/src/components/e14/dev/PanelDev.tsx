@@ -260,6 +260,7 @@ export function PanelDev({ onClose }: { onClose: () => void }) {
       setEventosBuffer(await contarEventos());
       setErrores(await eventosPorDigest());
     } catch {
+      // panel de desarrollo: un buffer obs ilegible se muestra como vacío, sin tumbar el panel
       setEventosBuffer(0);
       setErrores([]);
     }
@@ -315,6 +316,7 @@ export function PanelDev({ onClose }: { onClose: () => void }) {
       window.setTimeout(() => setListo(null), 1500);
       void refrescarErrores();
     } catch (err) {
+      // el fallo ya sube a la UI como motivo inline (vía de flujo, nunca throw)
       setMotivo(motivoDeError(err));
     } finally {
       setExportando(null);
@@ -376,6 +378,7 @@ export function PanelDev({ onClose }: { onClose: () => void }) {
       setListoIA(true);
       window.setTimeout(() => setListoIA(false), 1500);
     } catch (err) {
+      // el fallo ya sube a la UI como motivoIA inline (vía de flujo, nunca throw)
       setMotivoIA(motivoDeError(err));
     } finally {
       setExportandoIA(false);

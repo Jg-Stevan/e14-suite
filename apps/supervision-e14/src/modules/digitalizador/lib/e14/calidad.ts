@@ -232,6 +232,7 @@ function senalHiResDeCanvas(
     const contrastPapel = Math.min(100, ((p95 - p5) * 100) / PAPER_SPREAD_NORM);
     return { sharpnessHi, contrastPapel };
   } catch {
+    // medición best-effort: a 0/0 el score v2 degrada al comportamiento actual — sin señal no se condena
     return { sharpnessHi: 0, contrastPapel: 0 };
   }
 }
@@ -328,6 +329,7 @@ export async function calidadDeActa(
       const extra = senalHiResDeCanvas(img, img.naturalWidth, img.naturalHeight);
       return { ...q, ...extra };
     } catch {
+      // segunda caída (señales hi-res del frame): 0/0 — el score v2 conserva su fallback conservador
       return { ...q, sharpnessHi: 0, contrastPapel: 0 };
     }
   }
@@ -354,6 +356,7 @@ export async function esquinasDeActa(foto: string | undefined): Promise<Esquinas
     ctx.drawImage(img, 0, 0);
     return marcasEsquina(canvas);
   } catch {
+    // sin señal honesta no se condena: null jamás marca recorte (política del módulo)
     return null;
   }
 }

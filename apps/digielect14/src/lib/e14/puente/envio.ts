@@ -149,6 +149,7 @@ export function esOrigenLocal(
       /^172\.(1[6-9]|2\d|3[01])\./.test(host)
     );
   } catch {
+    // origen no-parseable: no es LAN — el botón HUB LOCAL simplemente no aparece
     return false;
   }
 }
@@ -165,6 +166,7 @@ export function fijarHubLocal(activo: boolean): string | null {
     } else window.localStorage.removeItem(CLAVE_OVERRIDE);
     return urlDelHub();
   } catch {
+    // almacenamiento bloqueado: null → la tarjeta ya explica que el hub no se pudo cambiar
     return null;
   }
 }
@@ -239,6 +241,7 @@ async function enviarLote(
     }
     return { ok: true, motivo: null };
   } catch (e) {
+    // el fallo de red se vuelve motivo: la cola conserva el lote y el ciclo reintenta
     const motivo =
       e instanceof DOMException && e.name === "AbortError"
         ? `timeout ${TIMEOUT_MS / 1000} s`
@@ -362,6 +365,7 @@ export async function sincronizarAhora(
       detalle = `${detalle} — puente detenido por fallos (${estado.ultimoError ?? "desconocido"})`;
     }
   } catch {
+    // el fallo ya sube a la tarjeta del puente como detalle visible — la cola queda intacta
     detalle = "Error: no se pudo sincronizar";
   }
   return { recuperadas, enviadas, fallos, detalle };

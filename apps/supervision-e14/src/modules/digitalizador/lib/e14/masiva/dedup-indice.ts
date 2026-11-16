@@ -152,6 +152,7 @@ export async function indiceEnviadasDe(): Promise<EntradaHistorica[]> {
     try {
       deLedger = await listarHistorico(); // llaves chicas — getAll seguro (L7)
     } catch {
+      // ledger caído ≠ fatal: el índice nace solo de la cola viva (RL-e65b-3)
       deLedger = [];
     }
   }
@@ -209,6 +210,7 @@ export async function enviadaPorPayload(
   try {
     return (await indiceEnviadasDe()).find((h) => h.payloadQr === payload) ?? null;
   } catch {
+    // índice caído ⇒ null conservador: la fila sigue su curso (RL-e65b-3)
     return null;
   }
 }

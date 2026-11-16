@@ -185,6 +185,7 @@ async function pageForAttempt(
         h = bmp.height;
         bmp.close();
       } catch {
+        // la vía bitmap falló: loadImage (<img>) mide las dimensiones por el camino de siempre
         const img = await loadImage(src);
         w = img.naturalWidth;
         h = img.naturalHeight;

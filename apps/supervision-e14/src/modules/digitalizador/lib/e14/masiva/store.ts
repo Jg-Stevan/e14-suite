@@ -1048,6 +1048,8 @@ export const useMasivaStore = create<MasivaStore>((set, get) => ({
           imagenes.push(...resultado.archivos);
           errores.push(...resultado.errores);
         } catch (err) {
+          // el zip/rar caído se vuelve fila ERROR persistente (motivo visible) — la ingesta del lote sigue
+          logger.debug("[e14] masiva comprimido rechazado en ingesta", { nombre: f.name, error: String(err) });
           errores.push({
             nombre: f.name,
             motivo: (
@@ -1068,6 +1070,8 @@ export const useMasivaStore = create<MasivaStore>((set, get) => ({
           imagenes.push(...resultado.archivos);
           errores.push(...resultado.errores);
         } catch (err) {
+          // el pdf caído se vuelve fila ERROR persistente (motivo visible) — la ingesta del lote sigue
+          logger.debug("[e14] masiva pdf rechazado en ingesta", { nombre: f.name, error: String(err) });
           errores.push({
             nombre: f.name,
             motivo: (

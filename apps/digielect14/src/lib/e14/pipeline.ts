@@ -947,6 +947,7 @@ export async function correrPipelineL2(
         },
       });
     } catch {
+      // el diagnóstico es metadato aditivo: si su construcción falla, el acta ya está resuelta — diag null
       diag = null;
     }
   }

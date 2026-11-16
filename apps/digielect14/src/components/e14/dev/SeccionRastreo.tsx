@@ -201,6 +201,7 @@ export function SeccionRastreo() {
       setListo(formato);
       window.setTimeout(() => setListo(null), 1500);
     } catch (err) {
+      // el fallo ya sube a la UI como motivo inline (vía de flujo, nunca throw)
       const crudo = err instanceof Error ? err.message : String(err);
       setMotivo((crudo.replace(/\s+/g, " ").trim().slice(0, 48) || "NO SE PUDO GENERAR").toUpperCase());
     } finally {

@@ -162,6 +162,7 @@ function gpuDe(): GpuInfo {
     }
     return info;
   } catch {
+    // WebGL bloqueado o roto: la ficha GPU queda vacía — el tier degrada sin romper
     return vacio;
   }
 }
@@ -183,6 +184,7 @@ function pantallaDe(): PantallaInfo {
         : null;
     return { anchoPx: ancho, altoPx: alto, dpr, pixelesMP: mp };
   } catch {
+    // screen inaccesible: la ficha del perfil reporta la pantalla en nulls
     return { anchoPx: null, altoPx: null, dpr: null, pixelesMP: null };
   }
 }
@@ -194,6 +196,7 @@ async function camarasDe(): Promise<number | null> {
     const dispositivos = await navigator.mediaDevices.enumerateDevices();
     return dispositivos.filter((d) => d.kind === "videoinput").length;
   } catch {
+    // enumerateDevices sin permiso o falló: nº de cámaras desconocido (null honesto)
     return null;
   }
 }
@@ -204,6 +207,7 @@ function heapLimitMBDe(): number | null {
     const v = p.memory?.jsHeapSizeLimit;
     return typeof v === "number" ? Math.round(v / 1048576) : null;
   } catch {
+    // performance.memory es solo Chrome: sin límite de heap, el perfil sigue
     return null;
   }
 }
@@ -214,6 +218,7 @@ function memoriaUsadaMBDe(): number | null {
     const v = p.memory?.usedJSHeapSize;
     return typeof v === "number" ? Math.round(v / 1048576) : null;
   } catch {
+    // performance.memory es solo Chrome: sin uso de heap, el perfil sigue
     return null;
   }
 }
@@ -227,6 +232,7 @@ async function bateriaDe(): Promise<{ nivel: number | null; cargando: boolean | 
     const b = await nav.getBattery();
     return { nivel: b.level, cargando: b.charging };
   } catch {
+    // getBattery ausente o falló (Safari/Firefox): batería en null honesto
     return { nivel: null, cargando: null };
   }
 }
@@ -238,6 +244,7 @@ async function storageLibreMBDe(): Promise<number | null> {
     if (typeof e.quota !== "number" || typeof e.usage !== "number") return null;
     return Math.round((e.quota - e.usage) / 1048576);
   } catch {
+    // storage.estimate puede faltar o fallar: espacio libre en null honesto
     return null;
   }
 }
@@ -256,6 +263,7 @@ function redDe(): { tipo: string | null; downlinkMbps: number | null; saveData: 
       saveData: c?.saveData === true,
     };
   } catch {
+    // navigator.connection no existe en Safari: red en nulls y el tier renormaliza
     return { tipo: null, downlinkMbps: null, saveData: false };
   }
 }
@@ -285,6 +293,7 @@ function benchmarkCpu(presupuestoMs = 120): number | null {
     if (ms <= 0 || iteraciones <= 0) return null;
     return Math.round(iteraciones / ms);
   } catch {
+    // el benchmark es opcional: null → esa dimensión se omite de la puntuación
     return null;
   }
 }
@@ -323,6 +332,7 @@ function benchmarkCanvas(): number | null {
     const ms = performance.now() - t0;
     return Math.round(ms * 10) / 10;
   } catch {
+    // canvas 2d puede estar bloqueado: sin benchmark, la dimensión se omite
     return null;
   }
 }
@@ -458,6 +468,7 @@ export function tierRapido(): { tier: Tier; tierInferido: boolean } {
       heapLimitMB: heapLimitMBDe(),
     });
   } catch {
+    // hasta la señal barata falló: MEDIO inferido, el default seguro del plan
     return { tier: "MEDIO", tierInferido: true };
   }
 }

@@ -15,10 +15,10 @@
   ],
   "modulos": {
     "codec.ts": "da9e19e1b887dd254580a5daa27f3d47",
-    "detector-client.ts": "1d3a1ba5a1fe6689c81d9ee961e0c5ba",
+    "detector-client.ts": "4ab6106e15c8433d905facd21c154f3b",
     "image-modes.ts": "0b8881cb025bd5adbde1a7421f5c1954",
-    "image-processor.ts": "5fdcb603f2fab371e34d7b4dcf5c58ee",
-    "ocr.ts": "57eb3786b8705a287dd40cc18801bacb",
+    "image-processor.ts": "44ebd70b469ae5f369e00d387c02ad40",
+    "ocr.ts": "bc61e395779043e81cf8d89cff0891f2",
     "types.ts": "54943986fffac5e0b58dc586ebf89a9d"
   }
 }

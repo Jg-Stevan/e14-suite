@@ -157,6 +157,7 @@ export async function jpegDimensionsFromBlob(blob: Blob): Promise<{ w: number; h
     }
     return null;
   } catch {
+    // Blob ilegible o header corrupto ⇒ null: el llamador cae a su camino de decodificación completa (contrato: dims ciertas o null, jamás a medias).
     return null;
   }
 }
@@ -332,6 +333,7 @@ async function dimensionesDesdeBlob(source: Blob): Promise<DimensionesImagen | n
     const buf = await source.slice(0, n).arrayBuffer();
     return dimensionesHeic(new Uint8Array(buf));
   } catch {
+    // Sin dims ciertas el rescate HEIC sigue sin tope por MP — el límite de 15 s queda de red; lo desconocido se marca, no se rellena (D23/D41).
     return null;
   }
 }
@@ -353,6 +355,7 @@ async function cabeceraBlob(source: Blob): Promise<Uint8Array | null> {
     const buf = await source.slice(0, 16).arrayBuffer();
     return new Uint8Array(buf);
   } catch {
+    // Blob ilegible ⇒ null: el olfateo de magic bytes sale conservador (no-HEIC) y la decisión queda en libheif, con su límite de tiempo como red.
     return null;
   }
 }
@@ -517,6 +520,7 @@ async function nativeDecodeToCappedDataUrl(blob: Blob): Promise<string | null> {
     if (!w || !h) return null;
     return await sourceToCappedJpegDataUrl(img, w, h);
   } catch {
+    // Tercera vía nativa (objectURL→<img>) también agotada ⇒ null: el llamador sigue al rescate HEIC o al error genérico.
     return null;
   } finally {
     URL.revokeObjectURL(objectUrl);
@@ -688,6 +692,7 @@ async function thumbnailFromBlob(blob: Blob): Promise<string> {
     ctx.drawImage(bm, 0, 0, tW, tH);
     return canvas.toDataURL("image/jpeg", 0.8);
   } catch {
+    // La miniatura es cosmética: fallo ⇒ "" y el acta procesada sigue su curso intacta (contrato del docblock, igual que su segunda vía).
     return "";
   } finally {
     // B-14 (auditoría leaks-recursos): liberar el bitmap del blob COMPLETO
@@ -720,6 +725,7 @@ async function thumbnailFromDataURL(url: string): Promise<string> {
     ctx.drawImage(img, 0, 0, tW, tH);
     return canvas.toDataURL("image/jpeg", 0.8);
   } catch {
+    // Segunda vía de la miniatura (re-decode, raro) ⇒ "": cosmética también, jamás rompe el guardado del acta.
     return "";
   }
 }
@@ -1089,6 +1095,7 @@ async function detectSobel(src: ImageSource): Promise<Quad> {
       { x: clamp01(left), y: clamp01(bottom) },
     ];
   } catch {
+    // Contrato del fallback «siempre devuelve algo»: Sobel roto ⇒ rect por defecto y el flujo del acta sigue (P1 lo reporta honesto como origen "sobel").
     return [
       { x: 0.08, y: 0.1 },
       { x: 0.92, y: 0.07 },
@@ -1564,6 +1571,7 @@ async function processImagePrecise(
       decodeMs,
     };
   } catch {
+    // Cualquier fallo del pipeline de precisión ⇒ null: processImage cae ÍNTEGRO al fallback canvas (output equivalente, jamás rompe al llamador).
     return null;
   }
 }
@@ -1605,6 +1613,7 @@ function canvasToDataURL(
         quality
       );
     } catch {
+      // toBlob roto síncronamente (Safari/iOS) ⇒ se resuelve con toDataURL: el encode jamás queda colgado (docblock, error #22).
       resolve(canvas.toDataURL(mime, quality));
     }
   });
@@ -1893,6 +1902,7 @@ export async function evaluateQuality(src: ImageSource): Promise<PageQuality> {
       level === "excellent" ? "Excelente" : level === "good" ? "Buena" : level === "fair" ? "Aceptable" : "Baja";
     return { level, sharpness, brightness, contrast, label };
   } catch {
+    // Sin métricas el score no puede condenar un acta: default «Buena» (70/70/70) y la captura sigue su curso.
     return {
       level: "good",
       sharpness: 70,

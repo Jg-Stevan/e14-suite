@@ -190,6 +190,7 @@ export async function obtenerDispositivo(): Promise<SnapshotDispositivo | null> 
   try {
     return await nucleoObtenerDispositivo();
   } catch {
+    // SSR o navegador sin APIs: null honesto — la UI muestra «—», jamás inventa
     return null;
   }
 }
@@ -234,6 +235,7 @@ export function idSesion(): string | null {
   try {
     return nucleoIdSesion();
   } catch {
+    // identidad best-effort: sin UUID solo degrada la telemetría, jamás la UI
     return null;
   }
 }
@@ -291,6 +293,7 @@ export async function obtenerPerfilDispositivo(
   try {
     return await nucleoObtenerPerfilDispositivo(forzar);
   } catch {
+    // solo cubre SSR (el núcleo es null-honesto): el panel queda sin perfil, no rompe
     return null;
   }
 }

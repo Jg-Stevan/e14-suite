@@ -59,6 +59,7 @@ export async function dhash64DeDataUrl(dataUrl: string): Promise<string | null> 
       bitmap.close();
     }
   } catch {
+    // canvas/decode fallaron: null — el dedup trata el acta como sin huella, jamás rellena
     return null;
   }
 }

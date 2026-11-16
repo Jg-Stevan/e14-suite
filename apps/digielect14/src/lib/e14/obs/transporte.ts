@@ -176,6 +176,7 @@ async function leerLotes(): Promise<LoteOutbox[]> {
     );
     return lotes.sort((a, b) => a.ts - b.ts || (a.id < b.id ? -1 : 1));
   } catch {
+    // outbox ilegible: 0 lotes — el flush descansa y el próximo ciclo relee IDB
     return [];
   }
 }
@@ -192,6 +193,7 @@ async function contarLotes(): Promise<number> {
     const db = await abrirOutbox();
     return await pedir<number>(storeDe(db, "readonly").count(), "OUTBOX_CONTAR");
   } catch {
+    // conteo ilegible: 0 — degrada solo el indicador de pendientes, no el envío
     return 0;
   }
 }
@@ -310,6 +312,7 @@ async function enviarLote(lote: LoteOutbox, endpoint: string): Promise<void> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     enviado = true;
   } catch {
+    // fetch fallido: no enviado → el lote vuelve al outbox con backoff (at-least-once)
     enviado = false;
   }
   if (enviado) {

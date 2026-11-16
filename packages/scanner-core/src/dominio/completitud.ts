@@ -198,6 +198,7 @@ export async function motorTinta(fotoProcesada: string): Promise<MotorTinta> {
     };
     return { utilizable: true, cw, ch, densidadDe };
   } catch {
+    // Decode/canvas fallido ⇒ motor no utilizable (contrato del docblock): el consumidor mantiene su condena geométrica — el acta no se pierde.
     return noUtilizable;
   }
 }

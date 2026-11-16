@@ -70,6 +70,7 @@ function redDelMomento(): { redTipo: string | null; redWifi: boolean | null } {
       redWifi: nav.connection?.type === "wifi" ? true : null,
     };
   } catch {
+    // connection API caprichosa ⇒ null-honest: la regla P-23 difiere sin inventar red
     return { redTipo: null, redWifi: null };
   }
 }
@@ -80,6 +81,7 @@ async function precargarRuta(ruta: string): Promise<boolean> {
     const res = await fetch(ruta, { cache: "force-cache" });
     return res.ok;
   } catch {
+    // asset que no llega ⇒ false: se pierde la aceleración, la captura paga la descarga de siempre
     return false;
   }
 }

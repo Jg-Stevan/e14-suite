@@ -36,6 +36,7 @@ export function tokenLectura(): string {
   try {
     return window.localStorage.getItem(CLAVE_TOKEN) ?? "";
   } catch {
+    // Storage bloqueado (modo privado) = sin token: headers vacíos y el 401 del hub se muestra accionable en la tarjeta — el sondeo no se tumba.
     return "";
   }
 }
@@ -79,6 +80,7 @@ export function esOrigenLocal(origen: string): boolean {
       /^172\.(1[6-9]|2\d|3[01])\./.test(host)
     );
   } catch {
+    // Origen inválido/vacío → NO local (conservador): se exigen credenciales y el token jamás viaja en la URL de la foto.
     return false;
   }
 }

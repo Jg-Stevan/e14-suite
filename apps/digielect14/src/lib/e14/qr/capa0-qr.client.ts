@@ -15,6 +15,7 @@ configurarCapa0({
     try {
       return planAdaptativo().tier;
     } catch {
+      // plan ilegible: null → el paquete usa su tier por defecto, la cadena QR sigue
       return null;
     }
   },

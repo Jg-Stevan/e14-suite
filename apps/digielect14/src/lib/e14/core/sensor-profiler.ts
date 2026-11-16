@@ -185,6 +185,7 @@ export async function clampBlobToSafeCap(blob: Blob, capPx: number): Promise<Blo
       bitmap.close();
     }
   } catch {
+    // decode del gigante falló (OOM): blob intacto — el editor aplica su propio tope
     return blob;
   }
 }

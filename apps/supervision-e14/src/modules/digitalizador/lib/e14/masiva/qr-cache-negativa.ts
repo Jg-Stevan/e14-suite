@@ -47,6 +47,7 @@ export function cacheNegativaTiene(hashBytes: string): boolean {
   try {
     return entradas.has(hashBytes);
   } catch {
+    // fallo de lectura = miss: se paga el ladder de nuevo, jamás se pierde el QR
     return false;
   }
 }

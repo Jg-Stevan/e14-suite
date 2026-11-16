@@ -235,6 +235,7 @@ export async function requestOcr(
     try {
       return await runOcrLocal(image, onProgress);
     } catch {
+      // Si TAMBIÉN el motor local falla, se re-lanza el error del SERVIDOR (más informativo): no se traga — el llamador lo ve.
       throw serverErr instanceof Error ? serverErr : new Error("Error de OCR");
     }
   }

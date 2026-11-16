@@ -25,6 +25,7 @@ export function anclaDemoActiva(): boolean {
   try {
     return leerFlags().anclaDemoSupervision === true;
   } catch {
+    // leerFlags puede romperse (localStorage corrupto): false = ancla demo APAGADA — el panel arranca vacío y rotulado, jamás sembrado como real.
     return false;
   }
 }

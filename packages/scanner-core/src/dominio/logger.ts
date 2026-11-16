@@ -47,6 +47,7 @@ function aTexto(args: unknown[]): string {
       })
       .join(" ");
   } catch {
+    // aTexto ES el transporte del logger: un args circular/extraño degrada a "<sin-serializar>" — el transporte jamás rompe al logger ni altera la consola.
     return "<sin-serializar>";
   }
 }

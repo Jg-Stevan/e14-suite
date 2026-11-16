@@ -1532,6 +1532,7 @@ async function fasePipelineIntentos(ctxEntrada: CtxPipeline): Promise<SalidaPipe
     }
     return { fallo: false, ctx: { ...ctxEntrada, registro, entradaPrecalor, veredictoOrigen, preProceso, actaBruta, maestroDesenlace, decodeMasterMs, intentoDesenlace, preOcrMs, tPreOcrIntento, preOcrOrigenMs, preOcrDeskewMs, preOcrMasterMs, preOcrPasadas, watchdogUsados, etapaAlMorir, elapsedMuerteMs, rescateLanzado } };
   } catch (err) {
+    // el fallo de la fase viaja tipado con TODO su ctx: procesarUno lo vuelve fila ERROR — la cola sigue
     return { fallo: true, ctx: { ...ctxEntrada, registro, entradaPrecalor, veredictoOrigen, preProceso, actaBruta, maestroDesenlace, decodeMasterMs, intentoDesenlace, preOcrMs, tPreOcrIntento, preOcrOrigenMs, preOcrDeskewMs, preOcrMasterMs, preOcrPasadas, watchdogUsados, etapaAlMorir, elapsedMuerteMs, rescateLanzado }, error: err };
   }
 }

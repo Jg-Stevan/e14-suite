@@ -98,6 +98,7 @@ export function selectorLcp(el: Element | null | undefined): string | null {
     if (partes.length) s += `.${partes.join(".")}`;
     return s.slice(0, 80) || null;
   } catch {
+    // elemento raro (SVG/nativo): null — el valor LCP ya quedó medido sin selector
     return null;
   }
 }
@@ -302,7 +303,10 @@ export const SCRIPT_LCP_CLS = `
         var partes = String(clases || "").trim().split(/\\s+/).filter(Boolean).slice(0, 2);
         if (partes.length) s += "." + partes.join(".");
         return s.slice(0, 80) || null;
-      } catch (_e) { return null; }
+      } catch (_e) {
+        // elemento raro (SVG/nativo): null — el valor LCP ya quedó medido sin selector
+        return null;
+      }
     }
     try {
       new PerformanceObserver(function (l) {
@@ -313,9 +317,13 @@ export const SCRIPT_LCP_CLS = `
             estado.id = es[i].element && es[i].element.id ? es[i].element.id : null;
             estado.sel = selDe(es[i].element);
           }
-        } catch (_e) {}
+        } catch (_e) {
+          // una entrada malformada no tumba el observer: el siguiente candidato llega igual
+        }
       }).observe({ type: "largest-contentful-paint", buffered: true });
-    } catch (_e) {}
+    } catch (_e) {
+      // navegador sin soporte LCP: sin medición — el arranque sigue (kit extra)
+    }
     try {
       new PerformanceObserver(function (l) {
         try {
@@ -323,9 +331,13 @@ export const SCRIPT_LCP_CLS = `
           for (var i = 0; i < es.length; i++) {
             if (!es[i].hadRecentInput) { estado.cls += es[i].value; estado.shifts++; }
           }
-        } catch (_e) {}
+        } catch (_e) {
+          // un shift malformado no tumba el observer: la suma sigue con los demás
+        }
       }).observe({ type: "layout-shift", buffered: true });
-    } catch (_e) {}
+    } catch (_e) {
+      // navegador sin soporte layout-shift: sin CLS — el arranque sigue
+    }
     function publicar(fase) {
       try {
         var r = {
@@ -337,9 +349,15 @@ export const SCRIPT_LCP_CLS = `
         try {
           var elTxt = r.lcp ? (r.lcp.id ? "#" + r.lcp.id : (r.lcp.selector || "?")) : "—";
           console.info("[e14] lcp-cls LCP=" + (r.lcp ? Math.round(r.lcp.valor) + " ms" : "sin-candidato") + " elemento=" + elTxt + " | CLS=" + r.cls.total.toFixed(4) + " (" + r.cls.shifts + " shifts) [" + fase + "]");
-        } catch (_e) {}
-        try { w.dispatchEvent(new CustomEvent("e14-lcp-cls", { detail: { resultado: r, fase: fase } })); } catch (_e) {}
-      } catch (_e) {}
+        } catch (_e) {
+          // la traza es best-effort: el resultado ya quedó publicado en __e14LcpCls
+        }
+        try { w.dispatchEvent(new CustomEvent("e14-lcp-cls", { detail: { resultado: r, fase: fase } })); } catch (_e) {
+          // sin listener todavía: el global __e14LcpCls ya quedó publicado
+        }
+      } catch (_e) {
+        // publicar jamás rompe el arranque: la medición es un extra del kit
+      }
     }
     if (document.readyState === "complete") publicar("inmediato");
     else window.addEventListener("load", function () { publicar("load"); }, { once: true });
@@ -348,7 +366,9 @@ export const SCRIPT_LCP_CLS = `
         if (document.visibilityState !== "hidden") return;
         if (publicado && publicado.lcp === estado.lcp && publicado.cls === estado.cls) return;
         publicar("final");
-      } catch (_e) {}
+      } catch (_e) {
+        // el «final» es re-publicación best-effort: jamás rompe el listener
+      }
     });
   } catch (_e) { /* silencioso total — jamás rompe el arranque */ }
 })();

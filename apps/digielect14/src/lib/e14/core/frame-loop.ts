@@ -302,6 +302,7 @@ export class CameraFrameLoop {
       const data = ctx.getImageData(0, 0, TW, TH).data;
       return lumaHistogram(data);
     } catch {
+      // canvas perdido bajo presión: histograma vacío ese tick — la exposición degrada, el loop sigue
       return [];
     }
   }

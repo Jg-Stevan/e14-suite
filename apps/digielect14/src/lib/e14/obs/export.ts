@@ -280,6 +280,7 @@ async function miniaturaJpg(fuente: string | Blob, max = 200): Promise<Uint8Arra
     if (!blob) return null;
     return new Uint8Array(await blob.arrayBuffer());
   } catch {
+    // la miniatura es una muestra opcional del reporte: null → el ZIP sale sin ella
     return null;
   }
 }

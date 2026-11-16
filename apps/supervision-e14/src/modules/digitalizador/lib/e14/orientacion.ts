@@ -14,6 +14,7 @@ configurarPlan({
       const v = leerFlags().probeMiniLado;
       return typeof v === "number" && Number.isFinite(v) ? v : 320;
     } catch {
+      // flags ilegibles ⇒ 320 del kit: el probe corre con su lado por defecto
       return 320;
     }
   },

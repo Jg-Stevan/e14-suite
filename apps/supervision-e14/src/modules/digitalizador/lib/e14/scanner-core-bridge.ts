@@ -470,6 +470,7 @@ export class RealCoreBridge implements E14Bridge {
       quad = detalle.quad;
       quadOrigen = detalle.origen;
     } catch {
+      // sin detección ⇒ quad identidad: la full-res se procesa entera (degradación honesta §0)
       quad = defaultQuad();
     }
     // 2) Pipeline de RECORTE existente sobre la foto nueva (calidad + OCR +
@@ -829,6 +830,7 @@ export class RealCoreBridge implements E14Bridge {
           },
         });
       } catch {
+        // el diagnóstico es instrumentación: sin él, el desenlace del recorte ya está resuelto
         diag = null;
       }
     }

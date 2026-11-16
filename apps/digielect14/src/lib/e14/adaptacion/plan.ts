@@ -205,6 +205,7 @@ function nucleosDisponibles(): number {
     const n = navigator.hardwareConcurrency;
     return typeof n === "number" && n > 0 ? n : 1;
   } catch {
+    // hardwareConcurrency es opcional: 1 núcleo es el piso conservador del plan
     return 1;
   }
 }
@@ -217,6 +218,7 @@ function hilosWasmDisponibles(): boolean {
       self.crossOriginIsolated === true
     );
   } catch {
+    // sin SharedArrayBuffer/COOP-COEP el wasm corre a 1 hilo: false es el informe honesto
     return false;
   }
 }
@@ -349,6 +351,7 @@ export function presupuestoEscaneoEfectivo(): number {
   try {
     return planAdaptativo().presupuestoEscaneoMs;
   } catch {
+    // jamás romper el escaneo por el plan: default histórico de 120 s
     return PRESUPUESTO_ESCANEO_DEFAULT_MS;
   }
 }
@@ -360,6 +363,7 @@ export function esperaWorkerEfectiva(): number {
   try {
     return planAdaptativo().esperaWorkerMs;
   } catch {
+    // jamás romper el warm-up por el plan: 5 s histórico exacto
     return ESPERA_WORKER_DEFAULT_MS;
   }
 }
@@ -371,6 +375,7 @@ export function presupuestoProbeOrientacionEfectivo(): number {
   try {
     return planAdaptativo().probeOrientacionMs;
   } catch {
+    // jamás romper el probe por el plan: 12 s histórico exacto
     return PROBE_ORIENTACION_DEFAULT_MS;
   }
 }

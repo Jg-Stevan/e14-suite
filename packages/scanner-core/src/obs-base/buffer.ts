@@ -291,6 +291,7 @@ async function mantener(): Promise<void> {
     }
     await txTerminada;
   } catch {
+    // Best-effort por contrato (B2.1): el fallo queda CONTADO como descarte — la retención jamás detiene el append del evento.
     registrarDescarteBuffer("mantenimiento-error");
   }
 }
@@ -309,6 +310,7 @@ export async function leerEventos(
     const orden = todos.sort((a, b) => a.ts - b.ts);
     return f ? orden.filter(f) : orden;
   } catch {
+    // Fallo IDB ⇒ [] honesto: el reporte/export degradan a vacío, jamás lanzan (docblock).
     return [];
   }
 }
@@ -322,6 +324,7 @@ export async function contarEventos(): Promise<number> {
       "IDB_CONTAR",
     );
   } catch {
+    // Fallo IDB ⇒ 0: el conteo es solo telemetría de estado — su fallo no cambia ninguna decisión del flujo.
     return 0;
   }
 }

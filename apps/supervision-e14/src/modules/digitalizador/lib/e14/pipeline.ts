@@ -208,6 +208,7 @@ async function esperarWorkerCaliente(topeMs: number): Promise<boolean> {
       new Promise<boolean>((res) => setTimeout(() => res(false), topeMs)),
     ]);
   } catch {
+    // worker frío/roto ⇒ false: el pipeline sigue con el fallback Sobel de siempre
     return false;
   }
 }
@@ -786,6 +787,7 @@ export async function correrPipelineL2(
           try {
             return clasificarCabecera(t, baseLectura).nivel;
           } catch {
+            // clasificación caída ⇒ MANUAL (neutral): la telemetría sale, jamás se inventa un nivel
             return "MANUAL";
           }
         }
@@ -1073,6 +1075,7 @@ export async function correrPipelineL2(
           },
         });
       } catch {
+        // el diagnóstico es instrumentación: sin él, el desenlace del acta ya está resuelto
         diag = null;
       }
     }

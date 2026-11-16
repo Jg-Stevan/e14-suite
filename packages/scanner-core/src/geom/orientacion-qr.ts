@@ -205,6 +205,7 @@ async function canvasQrAlta(fotoOriginal: string): Promise<HTMLCanvasElement | n
   try {
     img = await loadImageMemo(fotoOriginal);
   } catch {
+    // Sin decode de la foto original no hay rescate hi-res ⇒ null: la brújula cede y el caller cae al sondeo OCR de siempre (contrato §1).
     return null;
   }
   const w = img.naturalWidth || 0;
@@ -325,6 +326,7 @@ async function zxLee(
     intentos.push(`${etiqueta}${hit ? "✓" : "✗"}`);
     return hit ? { payload: hit.text } : null;
   } catch {
+    // Un intento del ensamble reventó ⇒ queda etiquetado en `intentos` (calibración con datos) y sigue la ronda — la brújula nunca lanza.
     intentos.push(`${etiqueta}!err`);
     return null;
   }
@@ -349,6 +351,7 @@ function jsQrDe(
     intentos.push(`${etiqueta}${ok ? "✓" : "✗"}`);
     return ok ? { payload: q!.data } : null;
   } catch {
+    // Ídem zxLee: el fallo queda etiquetado en `intentos` y el ensamble sigue con la siguiente variante — nadie lanza (contrato «jamás throw»).
     intentos.push(`${etiqueta}!err`);
     return null;
   }
@@ -384,6 +387,7 @@ async function vertDelWarp(fotoOcr: string): Promise<boolean> {
     if (!w || !h) return true;
     return h >= w;
   } catch {
+    // Decode fallido ⇒ default vertical (el caso E-14, docblock): solo ordena el sondeo de esquinas — jamás lanza.
     return true;
   }
 }
@@ -423,6 +427,7 @@ async function warpQrJsQrAsync(
   try {
     img = await loadImageMemo(fotoOcr);
   } catch {
+    // Sin decode del warp no hay PASO 1 ⇒ null: el orquestador va directo al rescate hi-res (y de ahí al sondeo OCR de siempre).
     return null;
   }
   const w = img.naturalWidth || 0;

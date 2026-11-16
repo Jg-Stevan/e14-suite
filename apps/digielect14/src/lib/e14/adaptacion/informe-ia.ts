@@ -314,6 +314,7 @@ async function construirInformeIA(): Promise<InformeIA> {
           const s = idSesion();
           return s ? s.slice(0, 8) : null;
         } catch {
+          // metadato opcional del informe: sin UUID de sesión, el JSON se genera igual
           return null;
         }
       })(),

@@ -490,6 +490,7 @@ export async function extraerPdf(archivo: File): Promise<ResultadoExtraccion> {
       import.meta.url
     ).toString();
   } catch {
+    // asset del worker caído ⇒ PDF_WORKER_NO_CARGO: fila ERROR honesta, jamás un crash opaco
     throw new Error("PDF_WORKER_NO_CARGO");
   }
 
@@ -507,6 +508,7 @@ export async function extraerPdf(archivo: File): Promise<ResultadoExtraccion> {
   try {
     bytesPdf = await archivo.arrayBuffer();
   } catch {
+    // disco ilegible ≠ pdf corrupto (D35): el contenido ni se vio — fila con SU motivo
     throw new Error("ARCHIVO_ILEGIBLE");
   }
   let carga: ReturnType<typeof pdfjs.getDocument>;
@@ -523,6 +525,7 @@ export async function extraerPdf(archivo: File): Promise<ResultadoExtraccion> {
     carga = pdfjs.getDocument({ data: bytesPdf });
     doc = await carga.promise;
   } catch (err) {
+    // diagnóstico honesto (D35): protegido (PasswordException) vs corrupto — el motivo exacto viaja a la fila ERROR
     if ((err as { name?: string } | null)?.name === "PasswordException") {
       throw new Error("PDF_PROTEGIDO");
     }
@@ -597,6 +600,7 @@ async function extraerZip(
   try {
     bytesZip = await archivo.arrayBuffer();
   } catch {
+    // disco ilegible ≠ zip corrupto (D35): el contenido ni se vio — fila con SU motivo
     throw new Error("ARCHIVO_ILEGIBLE");
   }
   const archivos: File[] = [];
@@ -719,6 +723,7 @@ async function extraerRar(
   try {
     bytesRar = await archivo.arrayBuffer();
   } catch {
+    // disco ilegible ≠ rar corrupto (D35): el contenido ni se vio — fila con SU motivo
     throw new Error("ARCHIVO_ILEGIBLE");
   }
   let extractor: Awaited<ReturnType<typeof createExtractorFromData>>;
@@ -728,6 +733,7 @@ async function extraerRar(
       data: bytesRar,
     });
   } catch {
+    // el wasm no pudo montar el extractor: rar ilegible ⇒ PROTEGIDO_O_CORRUPTO (fila ERROR, no crash)
     throw new Error("PROTEGIDO_O_CORRUPTO");
   }
   const archivos: File[] = [];
@@ -787,6 +793,7 @@ async function fetchWasmUnrar(): Promise<ArrayBuffer> {
   try {
     respuesta = await fetch(url);
   } catch {
+    // el asset del wasm cayó (404/red): motivo propio WASM_NO_CARGO, jamás un falso corrupto (auditoría 2-c #14)
     throw new Error("WASM_NO_CARGO");
   }
   if (!respuesta.ok) throw new Error("WASM_NO_CARGO");

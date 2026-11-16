@@ -168,6 +168,7 @@ function abrirWal(): Promise<IDBDatabase> {
       req.onerror = () => reject(req.error ?? new Error("wal-open"));
       req.onblocked = () => reject(new Error("wal-blocked"));
     } catch (e) {
+      // throw síncrono de open() → rechazo: el contrato async sigue y conStore degrada a null
       reject(e instanceof Error ? e : new Error("wal-open"));
     }
   });
@@ -191,6 +192,7 @@ async function conStore<T>(
         tx.onerror = () => reject(tx.error ?? new Error("wal-tx"));
         tx.onabort = () => reject(tx.error ?? new Error("wal-tx"));
       } catch (e) {
+        // throw síncrono de transaction() → rechazo: conStore ya degrada a null honesto
         reject(e instanceof Error ? e : new Error("wal-tx"));
       }
     });
@@ -235,6 +237,7 @@ export async function leerYLimpiar(): Promise<DrenajeWal> {
     await conStore("readwrite", (s) => s.clear());
     return decision;
   } catch {
+    // WAL ilegible: null honesto — el arranque sigue, sin replay de un hang fantasma
     return null;
   }
 }

@@ -139,6 +139,7 @@ export function planRecomendado(tier: Tier, senales: RecursoSenales | null): Pla
       sincronizarSoloWifi: redDebil,
     };
   } catch {
+    // Catálogo de SOLO LECTURA (D6): al fallar se cae a los defaults que el pipeline ya corre — la app funciona igual, solo se pierde la tabla recomendada.
     return {
       tier,
       forma: "desconocido",

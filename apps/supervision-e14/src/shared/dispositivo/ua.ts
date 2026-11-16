@@ -33,6 +33,7 @@ export function hayEntornoNavegador(): boolean {
   try {
     return typeof navigator !== "undefined" && typeof window !== "undefined";
   } catch {
+    // Copia verbatim de senales.ts: entorno exótico donde hasta el chequeo de globals revienta → false = tratado como SSR (null honesto en los colectores).
     return false;
   }
 }
@@ -121,6 +122,7 @@ export async function bateriaDe(n: Navigator): Promise<LecturaBateria> {
     const b = await nav.getBattery();
     return { nivel: b.level, cargando: b.charging };
   } catch {
+    // getBattery puede rechazar (permisos/Firefox): null honesto — la batería solo condena BAJO cuando el dato EXISTE (§4.4, null no condena).
     return { nivel: null, cargando: null };
   }
 }
@@ -159,6 +161,7 @@ export function redActual(): { tipo: string | null; downlinkMbps: number | null 
     const r = redDe(nav);
     return { tipo: r.tipo, downlinkMbps: r.downlinkMbps };
   } catch {
+    // El sello jamás lanza (§G.2): null = sin dato de red del momento — la telemetría sale sin la marca, no sin enviarse.
     return null;
   }
 }
@@ -172,6 +175,7 @@ export async function storageLibreMB(): Promise<number | null> {
     if (typeof e.quota !== "number" || typeof e.usage !== "number") return null;
     return Math.round((e.quota - e.usage) / 1048576);
   } catch {
+    // estimate() puede rechazar según el contexto: null honesto — storage solo condena BAJO con dato presente, sin él no condena.
     return null;
   }
 }

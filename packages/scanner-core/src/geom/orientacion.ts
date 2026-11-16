@@ -250,6 +250,7 @@ function anilloGanadorLeer(): DesenlaceRot[] {
     }
     return anillo.slice(-ANILLO_TOPE); // anillo: solo los últimos 10
   } catch {
+    // localStorage podrido/bloqueado (privado, SSR) ⇒ anillo vacío: sin ganador el sondeo conserva el orden de hoy — el probe jamás tumba el pipeline.
     return [];
   }
 }
@@ -286,6 +287,7 @@ export function ganadorPersistente(): Rotacion | null {
     }
     return ganador;
   } catch {
+    // Fallo derivando el ganador ⇒ null: sin señal de campo, sondeo y rescate conservan su orden base (comportamiento de hoy).
     return null;
   }
 }
@@ -366,6 +368,7 @@ export async function rotarDataUrl(
     });
     return girarFuente(img, rot).toDataURL("image/jpeg", 0.92);
   } catch {
+    // Re-encode/decode fallido ⇒ la entrada SIN tocar: el pipeline sigue con 0° (docblock §5) — rotar es optimización, jamás obligación.
     return dataUrl;
   }
 }
@@ -555,6 +558,7 @@ async function miniaturaDataUrlDe(fotoOcr: string, lado: number): Promise<string
     cv.height = 0;
     return url;
   } catch {
+    // Miniatura fallida ⇒ null: el sondeo corre a resolución original (comportamiento de hoy, docblock) — la miniatura es atajo, no obligación.
     return null;
   }
 }

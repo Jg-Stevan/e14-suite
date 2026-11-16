@@ -53,6 +53,7 @@ export function detalleDeTarget(
     if (!el) return null;
     return el.getAttribute("aria-label") ?? el.getAttribute("data-accion");
   } catch {
+    // closest puede lanzar con targets exóticos (SVG/nodos de texto) ⇒ null honesto: el breadcrumb cae a «clic» anónimo y el rastreo sigue.
     return null;
   }
 }

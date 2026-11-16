@@ -64,7 +64,9 @@ const SW_REGISTRO = `(function(){try{
 // mono-hilo de siempre (byte-idéntico a sin SW).
 if(localStorage.getItem("e14-coi-sw")==="off"){
 sessionStorage.removeItem("coi-sw-recarga");
-if(navigator.serviceWorker)navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister();})}).catch(function(){});
+if(navigator.serviceWorker)navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister();})}).catch(function(){
+// Limpieza best-effort del kill-switch: si un unregister falla, el SW residual queda inerte (la bandera sigue "off" y nada lo vuelve a registrar) y la página cae al camino mono-hilo.
+});
 return;
 }
 if(window.crossOriginIsolated){sessionStorage.removeItem("coi-sw-recarga");return;}
@@ -75,8 +77,12 @@ function recarga(){if(!sessionStorage.getItem("coi-sw-recarga")){sessionStorage.
 if(reg.active)recarga();
 reg.addEventListener("updatefound",function(){var nw=reg.installing;if(!nw)return;
 nw.addEventListener("statechange",function(){if(nw.state==="activated")recarga();});});
-}).catch(function(){});
-}catch(e){}})();`;
+}).catch(function(){
+// Registro best-effort: si el SW no registra no hay aislamiento COI y el panel corre mono-hilo de siempre (numThreads=1) — sin recarga ni bloqueo.
+});
+}catch(e){
+// Cortafuegos del IIFE del bootstrap del SW: cualquier fallo se traga — sin SW la página simplemente nace sin aislamiento y sigue mono-hilo; jamás romper el head.
+}})();`;
 
 export default function RootLayout({
   children,

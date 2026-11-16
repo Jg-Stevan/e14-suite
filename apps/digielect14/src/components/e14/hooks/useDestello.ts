@@ -95,6 +95,7 @@ async function downscaleImage(
   try {
     return canvas.toDataURL("image/jpeg", 0.95);
   } catch {
+    // toBlob y toDataURL fallaron: null → el llamador sigue con la foto original
     return null;
   }
 }
@@ -135,6 +136,7 @@ async function reescalarFueraDelHilo(
       bitmap.close?.();
     }
   } catch {
+    // camino rápido opcional: cualquier fallo → null y el llamador usa el camino robusto de siempre
     return null;
   }
 }

@@ -112,6 +112,7 @@ function obtenerWorker(): Worker | null {
     // "module", que rompería este bundle).
     worker = new Worker(WORKER_URL(), { name: WORKER_NAME });
   } catch {
+    // Worker imposible de construir (CSP/404 del bundle) ⇒ null: degradación honesta — el caller cae a su cadena jsQR de main thread.
     worker = null;
   }
   if (worker) {

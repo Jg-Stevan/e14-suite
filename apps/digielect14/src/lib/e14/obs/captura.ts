@@ -12,6 +12,7 @@ configurarObsBase({
     try {
       return leerPolitica().metadatos;
     } catch {
+      // política ilegible: metadatos ON es el default de fábrica (opt-out) — la captura sigue
       return true;
     }
   },

@@ -224,6 +224,7 @@ export function clasificar(
 
     return { tier, tierInferido, evidencia, confianzaPct };
   } catch {
+    // Fallback conservador: MEDIO inferido con confianza 0 (evidencia vacía, honesto) — ni condena a un BAJO injusto ni promueve ALTO sin pruebas; el panel no se tumba.
     return { tier: "MEDIO", tierInferido: true, evidencia: [], confianzaPct: 0 };
   }
 }

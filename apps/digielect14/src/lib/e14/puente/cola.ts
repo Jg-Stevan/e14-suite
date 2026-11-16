@@ -136,6 +136,7 @@ async function hashDeEntrada(entrada: EntradaPuente): Promise<string> {
     ).join("");
     return hex;
   } catch {
+    // sin crypto.subtle (SSR/http): FNV-1a con prefijo f- — el dedup sigue en su propio espacio de llaves
     return `f-${fnv1a8(semilla)}`;
   }
 }

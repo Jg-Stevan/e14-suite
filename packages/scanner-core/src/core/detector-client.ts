@@ -239,6 +239,7 @@ export class ScannerWorkerClient {
       // devtools/ps. El tipo de worker NO cambia (IIFE clásico).
       this.worker = new Worker(WORKER_URL, { name: "detection-precision-v1" });
     } catch {
+      // Worker irreparable de construir (URL/CSP): queda dead y ready=false — el pipeline cae a su detector Sobel/canvas de respaldo.
       this.dead = true;
       this.readyResolve?.(false);
       return;
@@ -364,6 +365,7 @@ export class ScannerWorkerClient {
         try {
           this.worker!.postMessage(msg, transfer);
         } catch (e) {
+          // No se traga: el fallo del postMessage se enruta como rechazo de ESTA promesa — el catch del llamador ya degrada a su fallback.
           this.pending.delete(ts);
           reject(e instanceof Error ? e : new Error(String(e)));
         }
@@ -396,6 +398,7 @@ export class ScannerWorkerClient {
           [bitmap]
         )) as DetectOutcome;
       } catch {
+        // Fallo del worker en detect ⇒ null: el llamador cae a su detector local de respaldo (contrato del docblock).
         return null;
       }
     });
@@ -453,6 +456,7 @@ export class ScannerWorkerClient {
           [bitmap]
         )) as WarpOutcome;
       } catch {
+        // Warp fallido ⇒ null: el llamador cae a su rectificación canvas de respaldo (contrato del docblock).
         return null;
       }
     });
@@ -487,6 +491,7 @@ export class ScannerWorkerClient {
           [bm]
         )) as EnhanceOutcome;
       } catch {
+        // Enhance fallido ⇒ null: el llamador cae a su filtro canvas de respaldo (contrato del docblock).
         return null;
       }
     });

@@ -155,6 +155,7 @@ export function ResumenView() {
       setPuenteEstado(estadoPuente());
       setPuentePendientes(await contarPendientes());
     } catch {
+      // el fallo ya sube a la tarjeta del puente como feedback visible; RESUMEN sigue
       setPuenteFeedback("Error: no se pudo sincronizar");
     } finally {
       setPuenteSincronizando(false);

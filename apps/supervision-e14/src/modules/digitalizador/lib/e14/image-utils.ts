@@ -29,6 +29,7 @@ function encodeJpegDataUrl(canvas: HTMLCanvasElement): Promise<string> {
         fr.readAsDataURL(b);
       }, "image/jpeg", 0.92);
     } catch (e) {
+      // el fallo síncrono de toBlob se convierte en rechazo — el llamador (rotar/recortar) ya lo maneja
       reject(e instanceof Error ? e : new Error("toBlob falló"));
     }
   });
@@ -281,6 +282,7 @@ export async function procesadaVaciaDataUrl(url: string): Promise<boolean> {
     }
     return oscuras / (TINTA_LADO * TINTA_LADO) < TINTA_FRACCION_MINIMA;
   } catch {
+    // conservador: sin medición NO se afirma «vacía» — false muestra la procesada
     return false;
   }
 }

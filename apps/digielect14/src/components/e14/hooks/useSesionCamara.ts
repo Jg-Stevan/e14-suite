@@ -112,6 +112,7 @@ function esCalidadPrimero(): boolean {
     const dm = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
     return CAN_TAKEPHOTO && dm === 8;
   } catch {
+    // navegador sin deviceMemory: al camino rápido (la espera full-res es solo para 8 GB)
     return false;
   }
 }
@@ -153,6 +154,7 @@ function qrHardKillsDefensivo(): number | undefined {
     try {
       return leerQrHardKills();
     } catch {
+      // contador solo-diagnóstico de consola: undefined y la telemetría sigue sin el campo
       return undefined;
     }
   }
@@ -259,6 +261,7 @@ function leerFacingDeStream(stream: MediaStream): string | undefined {
     const st = track.getSettings() as { facingMode?: string } | undefined;
     return st?.facingMode;
   } catch {
+    // getSettings puede lanzar (Safari/webcams USB): sin facing, la clasificación cae al label
     return undefined;
   }
 }
@@ -710,6 +713,7 @@ export function useSesionCamara({
             ]);
             return blob && blob.size > 0 ? blob : null;
           } catch {
+            // peldaño rechazado o desnudo que expiró: null → la escalera prueba el siguiente
             return null;
           }
         };
@@ -750,6 +754,7 @@ export function useSesionCamara({
         // excede el tope; si no, el blob original pasa intacto).
         return await clampBlobToSafeCap(blob, profile?.safeCapPx ?? getSensorSafeCap());
       } catch {
+        // takePhoto es un camino, no el único: null → el flujo cae al frame del visor
         return null;
       }
     },
@@ -892,6 +897,7 @@ export function useSesionCamara({
           (d) => d.kind === "videoinput" && d.deviceId
         );
       } catch {
+        // sin enumerateDevices no hay sondas: la cascada facingMode abre cámara igual
         devices = [];
       }
       const probes: CameraProbeResult[] = [];

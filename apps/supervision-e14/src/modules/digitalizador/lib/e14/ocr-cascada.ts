@@ -87,6 +87,7 @@ async function recortarRoiDataUrl(
     ctx.drawImage(img, 0, y0, W, hSrc, 0, 0, wDst, hDst);
     return canvas.toDataURL("image/jpeg", 0.92);
   } catch {
+    // recorte del ROI de rescate: null = se descarta el intento extra, la cascada conserva su mejor pasada
     return null;
   }
 }
@@ -102,6 +103,7 @@ async function tessParaGate(
     const r = await tessReconocer(foto, restante, onProgress);
     return { texto: r.texto, conf: r.conf, cap: "tess", motor: "tesseract" };
   } catch {
+    // Tesseract caído ⇒ null: intento1 cae directo a RapidOCR — la lectura no se pierde
     return null;
   }
 }

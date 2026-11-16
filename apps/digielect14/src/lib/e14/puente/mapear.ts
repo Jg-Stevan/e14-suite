@@ -40,6 +40,7 @@ function blobADataUrl(blob: Blob): Promise<string | null> {
       lector.onerror = () => resolve(null);
       lector.readAsDataURL(blob);
     } catch {
+      // FileReader roto: null → el caller salta el acta, jamás inventa una foto
       resolve(null);
     }
   });

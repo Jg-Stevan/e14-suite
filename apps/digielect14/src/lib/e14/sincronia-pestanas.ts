@@ -106,6 +106,7 @@ export function suscribirseAJornadaCambiada(cb: () => void): () => void {
   try {
     c.addEventListener("message", alMensaje);
   } catch {
+    // canal cerrado o raro: suscripción nula — esta pestaña vive sin aviso (como siempre)
     return () => {};
   }
   return () => {

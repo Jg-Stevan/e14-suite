@@ -79,6 +79,7 @@ function obtenerWorker(): WorkerSondeo | null {
   try {
     worker = fabrica();
   } catch {
+    // worker que no nace ⇒ null: el sondeo se salta y el dedup sigue in-pool
     worker = null;
   }
   if (worker) {
@@ -312,6 +313,7 @@ async function ejecutar(tarea: {
     try {
       w.postMessage({ blob: archivo, presupuestoMs });
     } catch {
+      // postMessage roto: respawn del worker y null — la ingesta sigue (dedup in-pool)
       terminarWorker();
       terminar(null);
     }

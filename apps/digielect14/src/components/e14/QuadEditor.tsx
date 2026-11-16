@@ -248,6 +248,7 @@ export function QuadEditor({
       const quad = await detectDocumentEdges(fotoOriginal);
       animarQuadHacia(quad);
     } catch {
+      // la detección es solo una ayuda: el fallo se anuncia inline y el quad manual queda intacto
       setMensajeReadout("NO SE PUDO DETECTAR");
       window.setTimeout(() => setMensajeReadout(null), 2000);
     } finally {

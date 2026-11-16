@@ -89,6 +89,7 @@ function horaEnZona(fecha: number, zona: string): string {
       timeZone: zona,
     }).format(fecha);
   } catch {
+    // Zona IANA inválida del país emisor: "—" es el hueco honesto (R6) — jamás inventar la hora ni romper la fila del feed.
     return "—";
   }
 }

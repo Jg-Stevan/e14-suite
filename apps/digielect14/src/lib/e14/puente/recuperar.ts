@@ -49,6 +49,7 @@ function actaDeRegistro(registro: unknown): ActaMapeable | null {
     }
     return pareceActa(registro) ? (registro as ActaMapeable) : null;
   } catch {
+    // registro hostil (getters que lanzan): null → se cuenta como saltada y el barrido sigue
     return null;
   }
 }
@@ -94,12 +95,14 @@ async function leerArchivosMasiva(): Promise<unknown[] | null> {
             resolve(null);
           };
         } catch {
+          // transacción/getAll síncronos rotos: null — tratado como sin DB masiva legible
           resolve(null);
         }
       };
       req.onerror = () => resolve(null); // SIN_DB — formato del kit
       req.onblocked = () => resolve(null);
     } catch {
+      // open síncrono roto: null — sin DB masiva, el barrido termina en 0/0
       resolve(null);
     }
   });

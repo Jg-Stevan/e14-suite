@@ -11,6 +11,7 @@ import { leerFlags } from "../flags";
 try {
   configurarNativo(leerFlags().ocrNativoUrl ?? null);
 } catch {
+  // flags ilegibles al armar el módulo ⇒ sin sidecar (null): el WASM de siempre queda de motor
   configurarNativo(null);
 }
 
@@ -54,6 +55,7 @@ export async function sondearUrlSidecarDirecta(
     return j?.ok === true;
   } catch {
     return false;
+    // la sonda ES un boolean: cualquier fallo (red/JSON/abort) = sidecar caído — jamás throw
   } finally {
     clearTimeout(timer);
   }

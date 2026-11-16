@@ -137,6 +137,7 @@ export async function tesseractInit(): Promise<boolean> {
     if (!ok) void tesseractReiniciar(); // abandonada: no dejar worker huérfano
     return true === ok;
   } catch {
+    // Init rota ⇒ workerProm a null (reintentable) y false: el caller cae al siguiente eslabón de la cascada (docblock).
     workerProm = null;
     return false;
   }

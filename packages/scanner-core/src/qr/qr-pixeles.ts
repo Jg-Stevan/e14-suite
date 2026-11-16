@@ -258,6 +258,7 @@ export function jsQrDeVentana(win: PixelesQr): string | null {
     });
     return res ? res.data : null;
   } catch {
+    // jsQR puede reventar con ventanas degeneradas ⇒ null: el barrido sigue con la siguiente ventana (red line e64 §7-4).
     return null;
   }
 }

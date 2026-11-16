@@ -101,6 +101,7 @@ export async function reescalarImportEnWorker(
   try {
     w = obtenerWorker();
   } catch {
+    // Worker imposible de crear (URL/CSP): romper() lo marca roto para la sesión — null = el llamador sigue por su ruta local del hilo principal.
     romper("no se pudo crear el worker");
     return null;
   }
@@ -119,6 +120,7 @@ export async function reescalarImportEnWorker(
     w.postMessage({ id, blob, ancho: dims.w, alto: dims.h, cap, calidad });
     return await respuesta;
   } catch {
+    // postMessage fallido o respuesta rechazada (error/timeout ya contados por romper): null = el llamador cae a su ruta local de reescalado.
     return null;
   } finally {
     clearTimeout(reloj);
