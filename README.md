@@ -49,17 +49,25 @@ son honestos — ver los README de cada app.
 ## Cómo correr
 
 ```bash
-bun install                          # desde la raíz (workspaces bun)
+bun install                          # desde la raíz (workspaces bun; bun 1.4.2 fijado)
 
 bun run dev:movil                    # PWA móvil
 bun run dev:panel                    # panel de supervisión
-bun run test:motor                   # suite del motor (~154 casos)
+bun run test:motor                   # suite del motor (207 casos)
 bun run verificar:movil              # preparar + typecheck + lint + tests (móvil)
 bun run verificar:panel              # verificar del panel
 ```
 
 Los modelos OCR/QR no se versionan: se descargan por `assets.lock.json`
 (URL + SHA-256, ~35–115 MB según app).
+
+### Regenerar las métricas de portada (que no vuelvan a vencer)
+
+| Métrica | Comando |
+| --- | --- |
+| Pruebas por suite | `bun test packages/scanner-core` · `cd apps/supervision-e14 && bun test` · `cd apps/digielect14 && bun run test` |
+| LOC TypeScript (sin vendor/assets) | `find apps packages \( -name '*.ts' -o -name '*.tsx' \) -not -path '*/node_modules/*' -not -path '*/.next/*' -not -path '*/public/*' -not -path '*/vendor/*' -print0 \| xargs -0 wc -l` |
+| DIVIPOLA (puestos/países/mesas) | congelada por test (`init-datos.test.ts` del panel) |
 
 ## Pipeline (resumen)
 
@@ -70,8 +78,12 @@ cámara → detección/quad → recortes → OCR (Tesseract/RapidOCR en WASM)
 
 ## Métricas de la suite
 
-~130.000 LOC TypeScript · ~1.000 pruebas · 949 puestos / 67 países / 3.670 mesas ·
-0 hallazgos de escaneo de secretos · CI de mínimo privilegio por app + motor.
+109.706 LOC TypeScript en 408 archivos (sin vendor/assets · medido 2026-11-16) ·
+1.033 pruebas (motor 207 · panel 422 · móvil 404 · medido 2026-11-16 tras el
+plan de remediación) · 949 puestos / 67 países / 3.670 mesas · 0 hallazgos de
+escaneo de secretos · CI de mínimo privilegio por app + motor + seguridad
+(gitleaks + bun audit). Cada cifra se regenera con el comando de la sección
+«Cómo correr» — nada de esta portada es irreproducible.
 
 ## Reglas del monorepo
 

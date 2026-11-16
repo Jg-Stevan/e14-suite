@@ -7,7 +7,7 @@
 | **Jurado de mesa** | Ciudadano que preside la mesa y diligencia el acta. Sus datos (nombre, cédula, firma) son sensibles: NUNCA deben entrar al repo ni a logs. |
 | **DIVIPOLA** | División Político-Administrativa de Colombia: codificación oficial de departamentos, municipios y puestos. El panel la usa para validar que el acta pertenezca al puesto correcto (monitor DIVIPOLA). |
 | **Puesto de votación** | Lugar físico donde votan los ciudadanos; contiene mesas. Identificado por código DIVIPOLA. |
-| **Mesa** | Unidad de votación dentro de un puesto (999 puestos / 3.670 mesas en el universo de datos de la suite). |
+| **Mesa** | Unidad de votación dentro de un puesto (949 puestos / 3.670 mesas en el universo de datos de la suite — congelado por test). |
 | **idEnlace** | Identificador que enlaza la captura móvil del acta con su registro en el panel (trazabilidad de extremo a extremo de la cadena offline-first). |
 | **Gate (puerta de calidad)** | Verificación automática antes de aceptar una captura: legibilidad, quad correcto, campos completos. Si el gate no pasa, el acta no sube. |
 | **Modo SIM** | Modo de demostración que usa imágenes sintéticas (`sim-*.jpg`) en lugar de actas reales. Es el modo de las demos de presentación. |

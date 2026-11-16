@@ -26,7 +26,7 @@ jobs:
       - name: instalar workspaces (lockfile de la raíz)
         run: bun install --frozen-lockfile
 
-      - name: suite del motor (~154 casos, golden contrato-motor.json)
+      - name: suite del motor (golden contrato-motor.json — el conteo lo imprime el runner)
         run: bun test packages/scanner-core
 
       - name: typecheck del paquete (si existe el script)
