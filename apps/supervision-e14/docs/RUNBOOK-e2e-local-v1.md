@@ -103,13 +103,22 @@ bun scripts/hub-local.mjs              # 8443 HTTPS + 8081 HTTP de respaldo
 
 ## Paso 3 — Probar el hub SIN celular (30 s)
 
+> **R-09 (auditoría 2026-11-16):** el GET de datos (`/actas`, `/foto/<seq>`,
+> `/hub/estado`) exige **token de lectura** — se imprime en la consola del hub
+> al arrancar (`token lectura <uuid>`), igual que la clave admin. Pégalo en una
+> variable y pásalo en los curls de LECTURA (los estáticos y el POST del móvil
+> siguen sin token):
+
 ```bash
-curl -sk https://127.0.0.1:8443/hub/estado
+TOKEN="<el-uuid-impreso-por-el-hub>"
+curl -sk -H "Authorization: Bearer $TOKEN" https://127.0.0.1:8443/hub/estado
 curl -sk -X POST https://127.0.0.1:8443/actas -H 'content-type: application/json' \
   --data-binary @"$TEMP/e2e-lote.json"
-curl -sk "https://127.0.0.1:8443/actas?desde=0"
+curl -sk -H "Authorization: Bearer $TOKEN" "https://127.0.0.1:8443/actas?desde=0"
 curl -sk https://127.0.0.1:8443/supervision/ -o /dev/null -w '%{http_code} %{size_download}\n'
 curl -sk https://127.0.0.1:8443/ -o /dev/null -w '%{http_code} %{size_download}\n'
+# Sin token → 401 accionable:
+curl -sk "https://127.0.0.1:8443/actas?desde=0"   # → 401 «sin token de lectura…»
 ```
 
 Un lote de prueba que pasa el validador del hub y **llena los dos caminos**

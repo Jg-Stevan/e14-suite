@@ -43,11 +43,11 @@ import { publicarActaMasiva, reiniciarIndicePaginas } from "./actas-runtime";
 import { esDhash64Valido, normalizarQrPayload } from "@/shared/e14/huellas";
 import type { EntradaActaMasiva } from "./actas-runtime";
 import type { FormularioTipo, ImpresionActa } from "../domain/acta";
-// 0.2/H-2 — token de lectura: el GET del hub dejó de ser anónimo. Con
-// origen NO local (hub remoto del puente) el sondeo viaja autenticado;
-// con origen local (hub-local.mjs, LAN) NO se manda auth — mismo criterio
-// `esOrigenLocal` del hermano (ver lib/token-lectura.ts).
-import { headersDeLectura } from "../lib/token-lectura";
+// 0.2/H-2 + R-09 — token de lectura: el GET del hub dejó de ser anónimo.
+// Desde R-09 (auditoría 2026-11-16, H-11) TAMBIÉN el hub local lo exige
+// (escucha en 0.0.0.0): el sondeo viaja autenticado contra cualquier
+// origen cuando hay token guardado (ver lib/token-lectura.ts).
+import { headersDeLectura, urlFotoConToken } from "../lib/token-lectura";
 // C-16 — la reconciliación tras un reset del hub purga el log de recepción.
 import { purgarRecepciones } from "./recepcion-log";
 
@@ -270,11 +270,12 @@ async function traerActas(desde: number, fetchComo: FetchComo): Promise<PaginaHu
  *  NO viaja como dataURL en el sondeo (serían megas cada 4 s): se pasa la URL
  *  del hub, que el visor resuelve como cualquier otra imagen same-origin.
  *
- *  NOTA 0.2 (auth de la foto): `fotoUrl` es `/foto/<seq>` RELATIVA — solo
- *  existe en el hub local (same-origin/LAN, que no pide auth, coherente
- *  con hub-local.mjs) y se resuelve contra el origen del panel. Un
- *  `Authorization` no puede viajar en un `<img>`; si el hub remoto llegara
- *  a servir /foto, el panel tendría que traerla por fetch autenticado
+ *  NOTA 0.2→R-09 (auth de la foto): `fotoUrl` es `/foto/<seq>` RELATIVA — hoy
+ *  solo el hub local la sirve (same-origin/LAN) y desde R-09 exige token:
+ *  `urlFotoConToken` añade `?token=` para que el `<img>` del visor pase la
+ *  credencial (un Authorization no puede viajar en una etiqueta de imagen).
+ *  Si un hub remoto llegara a servir /foto, el token no va en la URL (se
+ *  filtraría a logs/CDN): habría que traerla por fetch autenticado
  *  (headersDeLectura) y convertirla a blob URL — hoy no hay tal ruta. */
 function entradaDesdeHub(a: ActaHub): EntradaActaMasiva {
   const origen = typeof window !== "undefined" ? window.location.origin : "";
@@ -284,7 +285,7 @@ function entradaDesdeHub(a: ActaHub): EntradaActaMasiva {
     formulario: a.formulario,
     paginaIndex: a.paginaIndex,
     paginaTotal: a.paginaTotal,
-    srcFoto: a.fotoUrl ? `${origen}${a.fotoUrl}` : null,
+    srcFoto: a.fotoUrl ? urlFotoConToken(`${origen}${a.fotoUrl}`) : null,
     impresion: a.impresion,
     nombreArchivo: a.nombreArchivo,
     score: a.score,

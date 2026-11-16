@@ -16,13 +16,14 @@
  * del puente (0.1, `CLAVE_JORNADA` del digitalizador).
  *
  * CUÁNDO SE ENVÍA: `headersDeLectura(origenHub)` devuelve el header
- * `Authorization: Bearer …` SOLO si el origen del hub NO es local. La LAN
- * (hub-local.mjs, same-origin localhost/127./10./192.168./172.16-31) no
- * pide auth — el criterio es el MISMO de `esOrigenLocal` del hermano
- * (`digielect14/src/lib/e14/puente/envio.ts:96`): mismo origen local, sin
- * credenciales, coherente con el servidor local. Sin token guardado →
- * headers vacíos (el sondeo sigue; el 401 del hub se muestra accionable
- * en la tarjeta del hub, no como fallo mudo).
+ * `Authorization: Bearer …` SIEMPRE que haya token guardado. Hasta la
+ * auditoría 2026-11-16 (R-09/H-11) el hub LOCAL (LAN) no pedía credencial y
+ * el cliente se ahorraba el header — pero el hub escucha en 0.0.0.0 y
+ * cualquier dispositivo de la red leía actas y fotos de jurados sin más
+ * barrera que un rate-limit. Ahora el hub local también exige token (por
+ * sesión, impreso en su consola) y el cliente lo envía contra cualquier
+ * origen. Sin token guardado → headers vacíos (el sondeo sigue; el 401 del
+ * hub se muestra accionable en la tarjeta del hub, no como fallo mudo).
  */
 
 /** Clave de localStorage (pública por diseño — el VALOR es el secreto). */
@@ -83,15 +84,27 @@ export function esOrigenLocal(origen: string): boolean {
 }
 
 /**
- * Headers de LECTURA para el sondeo del hub. Con origen local (LAN,
- * hub-local.mjs) → {} (el servidor local no pide auth — coherencia con
- * hub-local.mjs). Con origen remoto y token configurado →
- * `{ Authorization: "Bearer <token>" }`. Sin token → {} (el 401 que
- * responda el hub se muestra accionable en la UI: «configúralo en
- * Configuración»).
+ * Headers de LECTURA para el sondeo del hub. Con token configurado →
+ * `{ Authorization: "Bearer <token>" }` para CUALQUIER origen (R-09: el hub
+ * local ahora también lo exige). Sin token → {} (el 401 que responda el hub
+ * se muestra accionable en la UI: «configúralo en Configuración»).
  */
-export function headersDeLectura(origenHub: string): Record<string, string> {
-  if (esOrigenLocal(origenHub)) return {};
+export function headersDeLectura(_origenHub: string): Record<string, string> {
+  void _origenHub; // R-09: el origen ya no exime — queda por firma estable
   const token = tokenLectura();
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/**
+ * R-09 — URL de foto con credencial para etiquetas `<img>` (que no pueden
+ * viajar con headers). El `?token=` se añade SOLO contra orígenes locales
+ * (el único /foto que existe hoy es el del hub local): contra un hub remoto
+ * el token en la URL se filtraría a logs/CDN — allí la foto, si algún día
+ * existe, deberá venir por fetch autenticado + blob URL.
+ */
+export function urlFotoConToken(urlFoto: string): string {
+  if (!esOrigenLocal(urlFoto)) return urlFoto;
+  const token = tokenLectura();
+  if (!token) return urlFoto;
+  return `${urlFoto}${urlFoto.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}`;
 }

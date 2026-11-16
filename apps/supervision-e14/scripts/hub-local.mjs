@@ -24,9 +24,12 @@
  *   GET  /actas?desde=<seq> → { ok, ahora, total, hay, proximoSeq, generacion, actas[] }
  *                             (cursor por SEQ, exclusivo; `hay` = quedan filas
  *                             más allá de la página — drenaje del panel, C-06)
+ *                             — R-09: exige token de lectura
  *   (`/actas` en POST se acepta como alias del contrato viejo)
  *   GET  /foto/<seq>       la foto almacenada (mime VALIDADO en recepción)
+ *                             — R-09: exige token de lectura
  *   GET  /hub/estado       contadores en vivo (para el runbook; sin rutas de disco)
+ *                             — R-09: exige token de lectura
  *   POST /hub/reset        vacía el almacén (demo) — exige header
  *                          `x-hub-reset: confirmar` (segundo factor, C-01)
  *   DELETE /v1/actas/<seq> expurgo individual — exige header
@@ -45,6 +48,13 @@
  *   · C-13 — DELETE con clave admin + auditoría expurgo.jsonl.
  *   · C-16 — `generacion` (UUID persistido) cambia en cada reset: el panel
  *     detecta el reinicio y re-sincroniza.
+ *   · R-09 (auditoría 2026-11-16, H-11) — el GET de DATOS (/actas, /foto/<seq>,
+ *     /hub/estado) exige token de lectura por sesión (Bearer o ?token=),
+ *     impreso al arrancar junto a la clave admin. Antes cualquier dispositivo
+ *     de la LAN que conociera la URL leía actas y fotos de jurados sin
+ *     credencial alguna (0.0.0.0 + rate-limit 120/min eran la única barrera).
+ *     Los estáticos (móvil/panel) siguen abiertos: el supervisor necesita
+ *     abrir el panel para PEGAR el token en Configuración.
  *
  * USO:
  *   bun scripts/hub-local.mjs                 # https en :8443 + http en :8081
@@ -528,6 +538,28 @@ function expurgar(seq, quien) {
 
 const RUTA_MUTANTE = /^\/(?:v1\/)?actas(?:\/(\d+))?$|^\/hub\/reset$/;
 
+/** R-09 — token de lectura válido para ESTA sesión. Acepta Bearer (sondeo
+ *  JSON) o ?token= (img). Los estáticos no pasan por aquí. */
+function tokenLecturaValido(req, url) {
+  const auth = req.headers.get("authorization") ?? "";
+  const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+  const porQuery = (url.searchParams.get("token") ?? "").trim();
+  return bearer === TOKEN_LECTURA || porQuery === TOKEN_LECTURA;
+}
+
+/** R-09 — 401 accionable (mismo tono del x-hub-admin): dice DÓNDE está el
+ *  token sin revelarlo. */
+function sinTokenLectura() {
+  return json(
+    {
+      ok: false,
+      error:
+        "sin token de lectura — se imprime en la consola del hub al arrancar; se pega en Configuración → Token de lectura (o Authorization: Bearer / ?token=)",
+    },
+    401
+  );
+}
+
 async function manejar(req) {
   const url = new URL(req.url);
   const ruta = url.pathname;
@@ -548,7 +580,11 @@ async function manejar(req) {
   // El móvil publica en `/v1/actas` (contrato 0.7); el panel sondea `/actas`.
   if (ruta === "/actas" || ruta === "/v1/actas") {
     if (req.method === "POST") return recibirActas(req, url);
-    if (req.method === "GET") return limitarLectura(req) ?? listarActas(url);
+    if (req.method === "GET") {
+      // R-09 — el GET de datos exige token; el rate limit sigue detrás.
+      if (!tokenLecturaValido(req, url)) return sinTokenLectura();
+      return limitarLectura(req) ?? listarActas(url);
+    }
     return json({ ok: false, error: "método no soportado" }, 405);
   }
   // C-13 — expurgo individual autenticado (la clave admin se imprime al arrancar).
@@ -560,13 +596,19 @@ async function manejar(req) {
     return expurgar(Number(mBorrar[1]), ipDe(req));
   }
   if (ruta === "/foto" || ruta.startsWith("/foto/")) {
+    // R-09 — la foto es un dato de jurado: exige token (Bearer o ?token=).
+    if (!tokenLecturaValido(req, url)) return sinTokenLectura();
     const excedido = limitarLectura(req);
     if (excedido) return excedido;
     const seq = Number(ruta.split("/")[2]);
     const foto = Number.isInteger(seq) ? await servirFoto(seq) : null;
     return foto ?? new Response("404", { status: 404, headers: HEADERS_BASE });
   }
-  if (ruta === "/hub/estado") return limitarLectura(req) ?? estado();
+  if (ruta === "/hub/estado") {
+    // R-09 — estado del hub tras token (contadores en vivo = telemetría LAN).
+    if (!tokenLecturaValido(req, url)) return sinTokenLectura();
+    return limitarLectura(req) ?? estado();
+  }
   if (ruta === "/hub/reset") {
     if (req.method !== "POST") return json({ ok: false, error: "usa POST" }, 405);
     // C-01 — segundo factor barato del reset destructivo (el botón de la UI
@@ -661,6 +703,13 @@ construirHostsConfiables();
 // Ajustes → Expurgo) para borrar filas individuales.
 const CLAVE_ADMIN = randomUUID();
 
+// R-09 (H-11, auditoría 2026-11-16) — TOKEN DE LECTURA del GET de datos:
+// /actas, /foto/<seq> y /hub/estado. Por sesión (como la clave admin), se
+// acepta como `Authorization: Bearer …` (sondeo JSON del panel) o `?token=`
+// (etiquetas <img>, que no pueden viajar con headers). El operador lo pega
+// una vez en Configuración → «Token de lectura del hub».
+const TOKEN_LECTURA = randomUUID();
+
 // C-04 — si el índice cargado excede la cuota, se AVISA (no se borra nada por
 // decisión propia): el hub atenderá lecturas pero rechazará lotes con 507.
 if (registro.length > CUOTA.filas || bytesTotales() > CUOTA.bytes)
@@ -678,6 +727,7 @@ console.log("\nHUB LOCAL e14 — almacén en", ALMACEN);
 console.log(`  cert TLS en   ${CARPETA_CERT} (sobrevive al reset — C-02)`);
 console.log(`  generación    ${generacion} (cambia en cada reset — C-16)`);
 console.log(`  clave admin   ${CLAVE_ADMIN} (header x-hub-admin para DELETE /v1/actas/<seq> — C-13)`);
+console.log(`  token lectura ${TOKEN_LECTURA} (Authorization: Bearer o ?token= en GET /actas, /foto/<seq>, /hub/estado — R-09; se pega en Configuración del panel)`);
 console.log(`  cuota         ${CUOTA.filas} filas / ${(CUOTA.bytes / 1048576).toFixed(0)} MB (HUB_CUOTA_FILAS / HUB_CUOTA_BYTES)`);
 console.log(`  actas recibidas hoy: ${registro.length}`);
 
