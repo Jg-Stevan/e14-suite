@@ -109,7 +109,7 @@ export function GaleriaSimulacion({ abierta, onCerrar, onElegir }: GaleriaSimula
           ))}
         </div>
 
-        <p className="border-t border-slate-800 px-4 py-2.5 text-[10px] font-mono text-slate-500 leading-snug">
+        <p className="border-t border-slate-800 px-4 py-2.5 text-[10px] font-mono text-slate-400 leading-snug">
           Fotos de prueba incluidas en el repositorio: no se envían al hub ni
           ocupan el cupo de la jornada. Cada imagen se procesa igual que con
           «Importar»; el botón «Importar» del dock sigue disponible para

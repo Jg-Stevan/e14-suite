@@ -11,12 +11,13 @@
 #                                  runner; NO hardcodear cifras — F16: el
 #                                  «17 archivos · 267 tests» anterior quedó
 #                                  desfasado 164 tests en dos meses)
-#   6. bun scripts/qa-*.ts      → los 7 harnesses de anclas y contrato
-#                                  (aa-quickwins 11 · autoenvío 21 ·
-#                                  obs-contract 38 · obs-privacidad 7 ·
-#                                  obs-transporte 8 · obs-ui 8 ·
-#                                  paridad-motor 14 — en CI sin hermano
-#                                  el último sale «omitido», paso 0)
+#   6. bun scripts/qa-*.ts      → los harnesses de anclas y contrato
+#                                  (aa-invariantes BLOQUEA · aa-cosmeticos
+#                                  avisa · autoenvío · obs-contract ·
+#                                  obs-privacidad · obs-transporte · obs-ui).
+#                                  R-31 separó invariantes de pines
+#                                  cosméticos; R-12 retiró qa-paridad-motor
+#                                  (monorepo = paridad estructural).
 #   7. bunx knip                → inventario de dead code (informativo — NO
 #                                  rompe el gate). Los exports de src/lib/e14/obs
 #                                  que knip no ve son anclas de contrato: los
@@ -26,9 +27,11 @@
 #
 # Uso:    bash scripts/check-quality.sh
 # Sale:   exit 0 si TODO verde; primer fallo corta con contexto.
-# Par:    .github/workflows/quality.yml corre los mismos pasos 1-6 (con
-#         `bunx next build` en vez de `bun run build`, y sin knip). Si aquí
-#         cambia un paso, cambiarlo allí también — y viceversa.
+# Par:    .github/workflows/ci-movil.yml (RAÍZ del monorepo) corre los mismos
+#         pasos con `verificar` + QA + smokes; ci-build.yml corre el build.
+#         Si aquí cambia un paso, cambiarlo allí también — y viceversa.
+#         (R-12: los .github anidados de apps/* jamás corrieron en GitHub
+#         y fueron purgados.)
 # Nota:   los QA validan ANCLAS DE FUENTE (lección 3A.1 del diagnóstico
 #         original) — por eso este gate corre CONTRA EL ÁRBOL COMMITEADO: un
 #         source-scan sobre el working tree puede dar verde con cambios sin
@@ -70,8 +73,9 @@ ok "vitest verde"
 paso "6/7 · Los 7 harnesses de regresión + contrato obs + AA quickwins (QA)"
 # Orden ALFABÉTICO EXACTO del glob scripts/qa-*.ts (los 4 obs-* quedan
 # al final del alfabeto) — NOMBRES[i-1] debe corresponder 1:1
-# con el i-ésimo archivo del glob (kit A3-C5).
-declare -a NOMBRES=(aa-quickwins autoenvio obs-contract obs-privacidad obs-transporte obs-ui paridad-motor)
+# con el i-ésimo archivo del glob (kit A3-C5). R-31: aa-quickwins se partió
+# en aa-cosmeticos + aa-invariantes; el cosmético sale 0 (aviso) a propósito.
+declare -a NOMBRES=(aa-cosmeticos aa-invariantes autoenvio obs-contract obs-privacidad obs-transporte obs-ui)
 i=0
 for f in scripts/qa-*.ts; do
   i=$((i+1))
