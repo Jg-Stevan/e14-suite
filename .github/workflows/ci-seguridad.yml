@@ -55,3 +55,21 @@ jobs:
       # de 2026-11 vivían ahí — knip/eslint/opennextjs — no en el bundle).
       - name: bun audit (0 vulnerabilidades o rojo)
         run: bun audit
+
+  actions-por-sha:
+    name: actions del CI pineadas por SHA (R-13)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      # R-13 (H-31, auditoría 2026-11-16): 38 refs `uses:` iban por tag
+      # mutable y 0 por SHA — si un tag se re-publica, el CI ejecuta código
+      # nuevo sin revisión (supply chain del propio gate de calidad). Este
+      # guard impide que una action nueva vuelva a entrar por tag.
+      - name: ninguna action por tag mutable
+        run: |
+          if grep -rEn 'uses:[[:space:]]*[^[:space:]]+@v[0-9]' .github/workflows/; then
+            echo "::error::Hay actions por tag mutable (arriba). Pinear por SHA completo con comentario de versión — ver R-13."
+            exit 1
+          fi
+          echo "OK · todas las actions del CI van por SHA"
