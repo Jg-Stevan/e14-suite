@@ -19,8 +19,12 @@
  *     la misma línea.
  * Es decir: un cambio de negocio se hace dos veces o el contrato lo grita.
  *
- * Tolerancia deliberada: `toEqual` ignora campos `undefined`, así que un campo
- * NUEVO opcional que no aporte valor pasa; si aporta valor, el golden lo exige.
+ * R-16 (auditoría 2026-11-16): `toStrictEqual` desde siempre debió ser la
+ * comparación — `toEqual` ignora campos `undefined` y un golden con huecos
+ * podía pasar roto. El generador serializa con canon() (claves ordenadas,
+ * sin undefined), así que el contrato SANO es estricto por construcción.
+ * Regeneración de un paso: `bun scripts/gen-contrato-motor.ts` (desde
+ * apps/digielect14 — escribe directo a este fixture; --check para CI).
  *
  * NO cubre (y no pretende): el OCR sobre píxeles (necesita navegador/wasm), el
  * `puente/` (existe solo aquí) ni `quad`/`score` (salida de la cascada, no del
@@ -100,7 +104,7 @@ describe("contrato de motor · clasificación (misma entrada ⇒ mismo resultado
   // hermano (`__tests__/contrato-motor.test.ts` de supervision-e14).
   for (const d of GOLDEN.descriptores) {
     test(`${d.id} — ${d.nota}`, () => {
-      expect(clasificarCabecera(d.ocr, BASE)).toEqual(d.esperado);
+      expect(clasificarCabecera(d.ocr, BASE)).toStrictEqual(d.esperado);
       expect(derivadosDe(d)).toEqual(d.derivados);
     }, 30_000);
   }
@@ -108,7 +112,7 @@ describe("contrato de motor · clasificación (misma entrada ⇒ mismo resultado
 
 describe("contrato de motor · escalera score→status", () => {
   test("los cantos 8 y 6.5 siguen siendo OPTIMA/ADVERTENCIA/RECHAZADA", () => {
-    expect(GOLDEN.estados.map(({ score }) => ({ score, status: statusDeScore(score) }))).toEqual(
+    expect(GOLDEN.estados.map(({ score }) => ({ score, status: statusDeScore(score) }))).toStrictEqual(
       GOLDEN.estados,
     );
   });
