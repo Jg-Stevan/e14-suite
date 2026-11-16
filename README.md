@@ -2,6 +2,13 @@
 
 Monorepo del ecosistema E-14: **digitalización de actas de escrutinio, 100 % client-side**.
 
+## Demos en vivo (Cloudflare Pages)
+
+| App | URL |
+| --- | --- |
+| digielect14 — PWA móvil, captura e importación de actas | https://digielect14.pages.dev/ |
+| supervision-e14 — panel de supervisión y carga masiva | https://supervision-e14.pages.dev/#dia=DOMINGO&vista=carga-masiva |
+
 ## Qué hay aquí
 
 ```

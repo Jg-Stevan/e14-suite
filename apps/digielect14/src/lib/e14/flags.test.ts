@@ -59,6 +59,12 @@ describe("flags · sanearFlags", () => {
     expect(sanearFlags({ bandaInferiorOcr: "sí" })).toEqual({});
   });
 
+  it("escaneo-compartido · escaneoIdentidad: override válido acepta; tipo inválido → default", () => {
+    expect(sanearFlags({ escaneoIdentidad: false })).toEqual({ escaneoIdentidad: false });
+    expect(sanearFlags({ escaneoIdentidad: true })).toEqual({ escaneoIdentidad: true });
+    expect(sanearFlags({ escaneoIdentidad: "sí" })).toEqual({});
+  });
+
 });
 
 describe("flags · leerFlags (cadena de prioridad)", () => {
@@ -125,6 +131,9 @@ describe("flags · leerFlags (cadena de prioridad)", () => {
       // KIT e14-seccion-inferior-banda-v1 — OCR dedicado de la banda inferior
       // cuando el OCR rápido no llegó al pie; default ON.
       bandaInferiorOcr: true,
+      // KIT escaneo-compartido-v1 — detector de origen en IMPORTAR (escaneo
+      // ya recortado → frame completo + marco impreso); default ON.
+      escaneoIdentidad: true,
     });
   });
 

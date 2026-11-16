@@ -42,6 +42,16 @@ import {
   verificarCompletitud,
   type ResultadoCompletitud,
 } from "@jg-stevan/scanner-core/dominio/completitud";
+// KIT escaneo-compartido-v1: el detector de ORIGEN y el MARCO IMPRESO viven
+// en el paquete (port de la masiva — misma regla para los dos pipelines).
+// Un archivo YA escaneado/recortado NO se re-recorta con el worker: su quad
+// es el frame completo y el marco del formulario gobierna el gate.
+import { clasificarOrigenDeArchivo } from "@jg-stevan/scanner-core/dominio/origen-escaneo";
+import {
+  evaluarMarcoImpreso,
+  marcoPerdonadoPorLectura,
+  type MarcoEscaneo,
+} from "@jg-stevan/scanner-core/dominio/marco-escaneo";
 // C-30 (IMPORTAR — opción 2): re-lectura del veredicto del guard bajo la
 // postura de archivo — capa app a propósito (el motor es compartido byte a
 // byte con supervision-e14; ver completitud-archivo.ts).
@@ -127,6 +137,17 @@ export async function correrPipelineL2(
   // 1) Entrada → data URL crudo (F-IMPORT del core: HEIC/EXIF/12MP seguros;
   //    en CAMARA sin archivo el dataUrl ya vino del grab del <video>).
   emitir({ etapa: "DETECTANDO", progreso: 0 });
+  // KIT escaneo-compartido-v1 (D63-A): detector de ORIGEN en paralelo al
+  // decode de la foto — SOLO la vía IMPORTAR (ARCHIVO). SIM y CÁMARA jamás
+  // lo consultan (chips SIM y gate de cámara intactos). Kill-switch del
+  // mantenedor: `escaneoIdentidad: false` ⇒ camino de siempre byte a byte.
+  const origenPromesa =
+    "archivo" in entrada &&
+    !opciones.simular &&
+    opciones.fuente === "ARCHIVO" &&
+    leerFlags().escaneoIdentidad
+      ? clasificarOrigenDeArchivo(entrada.archivo)
+      : null;
   const fotoOriginal =
     "archivo" in entrada
       ? await pasos.conRampa(
@@ -137,6 +158,13 @@ export async function correrPipelineL2(
           emitir,
         )
       : entrada.dataUrl;
+  // D63-A: «escaneo» = documento ya capturado (scanner/PDF de página plana).
+  // El detector JAMÁS lanza: null = duda honesta → camino de foto de siempre.
+  const origenActa = origenPromesa ? (await origenPromesa).origen : null;
+  const escaneoIdentidad = origenActa === "escaneo";
+  if (escaneoIdentidad) {
+    logger.info("[e14] origen=escaneo · quad identidad (página completa, sin detección)");
+  }
   ms.decode = performance.now() - inicio;
   parcial.fotoOriginal = fotoOriginal;
   syncParcial(); // B1 — frontera decode
@@ -203,9 +231,10 @@ export async function correrPipelineL2(
 
   // 2) Detección de bordes (worker OpenCV → fallback Sobel del core).
   //    §D8.3 (SPEC-e14-score-ocr Rev. 3): con sinRecorte la detección NO
-  //    corre — «el recorte es la foto entera»: pasos.quadIdentidad (se imprime
-  //    en el log como hoy, traza de auditoría). SOLO alcanzable desde la
-  //    rama SIMULACIÓN (ARCHIVO/CÁMARA corren detect byte a byte, AC15).
+  //    corre — «el recorte es la foto entera»: pasos.quadIdentidad. SOLO
+  //    alcanzable desde SIMULACIÓN. KIT escaneo-compartido-v1: un IMPORTAR
+  //    clasificado como ESCANEO tampoco corre detección (D63-C F2.1) — su
+  //    única geometría honesta es la página completa.
   const sinRecorte = "archivo" in entrada && entrada.sinRecorte === true;
   let quad: Quad;
   // KIT e14-quad-sobel-v1 (P1 §4-B): quién fabricó el quad de verdad —
@@ -220,6 +249,14 @@ export async function correrPipelineL2(
   const tDetect = performance.now();
   if (sinRecorte) {
     quad = pasos.quadIdentidad;
+  } else if (escaneoIdentidad) {
+    // D63-C (F2.1): un ESCANEO es rectangular por construcción — dejar que
+    // el worker «encuentre» un quad solo puede re-recortarlo (el único
+    // rectángulo fuerte es la tabla o el marco impreso). Página completa
+    // DESDE EL INICIO: sin worker, sin Sobel, sin espera fría. La rotación
+    // la resuelve el probe de orientación y el marco D63-C gobierna el gate.
+    quad = pasos.quadIdentidad;
+    quadOrigen = "pagina-completa";
   } else {
     try {
       // T1.1: worker frío → esperar su warm-up con tope de 5 s (mecanismo
@@ -545,6 +582,10 @@ export async function correrPipelineL2(
   }
   const rechazoTemprano =
     !opciones.simular &&
+    // D63-C: en un ESCANEO la completitud la gobierna el marco impreso y su
+    // perdón exige la LECTURA — cortar el OCR antes de leer impediría el
+    // perdón honesto de un marco ceñido/cortado.
+    !escaneoIdentidad &&
     leerFlags().ocrCorteIncompleta &&
     completitudEfectiva != null &&
     !completitudEfectiva.completa;
@@ -722,11 +763,34 @@ export async function correrPipelineL2(
   // desenlace ya estaba bloqueado antes de leer la primera letra.
   // (La `verificacionResuelta` se cosecha arriba, antes del OCR — la MISMA
   //  promesa y el MISMO objeto, solo más temprano.)
-  // NOTA (eliminación del módulo masiva): el gate de ESCANEOS por MARCO
-  // IMPRESO (D63-C T2) y el perdón de marco (e63d F0.2) corrían SOLO para
-  // entradas del runner MASIVA (`origenActa === "escaneo"`) — retirados
-  // con la cola. El guard de fotos (verificarCompletitud) manda igual.
+  // D63-C (T2) — gate de ESCANEOS por MARCO IMPRESO del formulario (portado
+  // al paquete desde la masiva): completo → no bloquea · ceñido → no bloquea
+  // (corte geométrico de la hoja, no de contenido) · no-encontrado → no
+  // bloquea (lectura/score deciden como siempre) · cortado → INCOMPLETA
+  // salvo perdón por LECTURA FUERTE sin sección faltante (e63d F0.2). El
+  // RECT del formulario alimenta la zona de votos (el marco ES el borde del
+  // acta — mismo sistema de referencia que las fracciones ZONA_*).
+  // SOLO escaneos: fotos y SIM nunca llegan aquí (escaneoIdentidad).
+  const marcoEscaneo: MarcoEscaneo | null =
+    !opciones.simular && escaneoIdentidad ? await evaluarMarcoImpreso(fotoProcesada) : null;
+  if (marcoEscaneo) {
+    logger.info(
+      `[e14] marco=${marcoEscaneo.veredicto}` +
+        (marcoEscaneo.rect
+          ? ` rect=${marcoEscaneo.rect.x0.toFixed(3)},${marcoEscaneo.rect.y0.toFixed(3)}` +
+            `,${marcoEscaneo.rect.x1.toFixed(3)},${marcoEscaneo.rect.y1.toFixed(3)}`
+          : ""),
+    );
+  }
   let completa = opciones.simular ? true : (completitudEfectiva?.completa ?? true);
+  if (marcoEscaneo) {
+    // e63d F0.2: la lectura perdona al marco, NUNCA al contenido faltante.
+    // senal y faltaSeccion ya están calculadas (caracterizarLectura) — costo 0.
+    completa =
+      marcoEscaneo.veredicto === "cortado"
+        ? marcoPerdonadoPorLectura(marcoEscaneo.veredicto, senal.nivel, faltaSeccion)
+        : true;
+  }
   // e71 (P10) — VETO 4/4 FIDUCIALES (kit e71-consolidación): la medición
   // de integridad encontró LAS 4 esquinas ausentes (traza
   // `esquinas=FALTA_tl+tr+bl+br`) → el papel NO está demostrado entero y
@@ -760,7 +824,7 @@ export async function correrPipelineL2(
   // demo no se rompe · decisión D41 del catálogo). INCOMPLETA
   // manda primero: el veto de votos SOLO condena actas completas sin
   // tinta en la zona de votos.
-  const marcadores = await medirZonaVotos(fotoProcesada, undefined);
+  const marcadores = await medirZonaVotos(fotoProcesada, marcoEscaneo?.rect ?? undefined);
   // KIT actas-vivas-paginas-v1 (FASE C): gate de votos SOLO P1 — la pág 2
   // (constancias) NO tiene zona de votos (hoy pasaba por la tinta de las
   // líneas impresas: de la suerte). Página desconocida → se mide

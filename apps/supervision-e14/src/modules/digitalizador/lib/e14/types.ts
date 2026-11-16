@@ -10,9 +10,9 @@ import type { NivelLectura } from "@jg-stevan/scanner-core/dominio/senal-lectura
 
 // D63-A (kit e63a-origen-escaneo-v1) — R7b (M10): el TIPO OrigenActa vive
 // ahora en el núcleo (types.ts) — fin de la dependencia invertida
-// núcleo→masiva (masiva/origen.ts lo re-exporta temporalmente; R8 retira).
-// El DETECTOR (senalExifCamara/clasificarOrigen/…) sigue en masiva/origen.ts:
-// es instrumentación del runner MASIVA, jamás decide score/gate.
+// núcleo→masiva. KIT escaneo-compartido-v1: el DETECTOR
+// (senalExifCamara/clasificarOrigen/…) vive en el paquete
+// (`dominio/origen-escaneo.ts`) — lo comparten el móvil y la masiva.
 /** Origen del archivo. null = sin veredicto (duda honesta — jamás inventar). */
 export type OrigenActa = "escaneo" | "foto" | null;
 

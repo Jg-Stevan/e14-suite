@@ -1,8 +1,10 @@
 /** KIT e63c-quad-gate-escaneo-v1 (D63-C): detector del MARCO IMPRESO del
- *  formulario E-14 para el gate de ESCANEOS. Evidencia (informe prod
- *  20261020-122235): «delegados-P1» leyó FUERTE y aun así el gate la tumbó
- *  con «ACTA CORTADA» — el guard afinado para FOTOS interpreta «contenido
- *  hasta el borde = cortada», y en un escaneo el acta va pegada al borde.
+ *  formulario E-14 para el gate de ESCANEOS — COMPARTIDO en el paquete
+ *  (port literal de supervision-e14 `lib/e14/marco-escaneo.ts`). Evidencia
+ *  (informe prod 20261020-122235): «delegados-P1» leyó FUERTE y aun así el
+ *  gate la tumbó con «ACTA CORTADA» — el guard afinado para FOTOS interpreta
+ *  «contenido hasta el borde = cortada», y en un escaneo el acta va pegada
+ *  al borde.
  *
  *  Regla de oro del kit §0: el gate sigue siendo HONESTO — lo que cambia es
  *  CÓMO se decide en escaneos: mirando el MARCO IMPRESO del formulario (el
@@ -28,16 +30,11 @@
  *  gate de fotos queda NI UNA LÍNEA distinto (kit T2.4/T3).
  *
  *  Parte PURA (sin DOM, testeable con bun): evaluarMarcoDeBitmap. Parte DOM
- *  (decode del data URL): evaluarMarcoImpreso. */
-
-/** Veredicto del marco impreso (traza aditiva `gateMarco` — kit T2.3).
- *  KIT e63d-escaneo-ya-recortado-v1 (F3.1): nuevo veredicto "ceñido" — el
- *  marco vive EN el filo (el escáner cortó atravesándolo): NO pierde
- *  contenido (el marco va insertado ~2% del ancho; cortar EN el marco solo
- *  recorta margen muerto) → NUNCA bloquea. "cortado" queda RESERVADO para
- *  el caso real: lados dentro del inset Y la lectura no rescata (F0.2 del
- *  bridge) — el escáner cortó DENTRO del área de contenido. */
-import { canvasCon } from "./image-utils"; // SPRINT-A A3 — factory de canvas
+ *  (decode del data URL): evaluarMarcoImpreso. `marcoPerdonadoPorLectura`
+ *  llegó aquí desde el pipeline de supervision-e14 (F0.2) para que el móvil
+ *  y la masiva compartan la MISMA regla del perdón. */
+import { loadImageMemo, canvasCon } from "./image-utils";
+import type { NivelLectura } from "./senal-lectura";
 
 export type MarcoImpreso = "completo" | "ceñido" | "cortado" | "no-encontrado";
 
@@ -169,17 +166,37 @@ export function evaluarMarcoDeBitmap(
   return { veredicto: "no-encontrado", rect: null };
 }
 
+/**
+ * KIT e63d-escaneo-ya-recortado-v1 (F0.2) · hotfix e63d-rev2 (kit e63e ANEXO A
+ * caso 4): la LECTURA perdona al marco «cortado» de un ESCANEO — mismo patrón
+ * que lazoPerdonadoPorLectura (tabla §3-A del kit). El perdón exige el trío
+ * COMPLETO: veredicto cortado + lectura FUERTE + secciones presentes
+ * (faltaSeccionInferior false). Cualquier otro caso → false: la mutilación
+ * real (falta una sección) y la lectura débil/media jamás se perdona —
+ * «la lectura perdona al marco, NO al contenido faltante». completo/ceñido/
+ * no-encontrado nunca bloquean por construcción (el perdón no aplica).
+ */
+export function marcoPerdonadoPorLectura(
+  veredicto: MarcoImpreso,
+  nivelLectura: NivelLectura,
+  faltaSeccion: boolean,
+): boolean {
+  return veredicto === "cortado" && nivelLectura === "FUERTE" && !faltaSeccion;
+}
+
 /** Decode del data URL PROCESADO a bitmap de análisis (parte DOM — solo
- *  navegador). Falla → "no-encontrado" (el marco jamás tumba el pipeline). */
-async function bitmapDeDataUrl(dataUrl: string): Promise<{ ancho: number; alto: number; rgba: Uint8ClampedArray } | null> {
+ *  navegador). Falla → null (el marco jamás tumba el pipeline). */
+async function bitmapDeDataUrl(
+  dataUrl: string,
+): Promise<{ ancho: number; alto: number; rgba: Uint8ClampedArray } | null> {
   try {
-    const img = new Image();
-    img.src = dataUrl;
-    await img.decode();
+    // Decode compartido del paquete (mismo LRU del pipeline; la procesada ya
+    // suele estar cacheada por completitud/marcadores).
+    const img = await loadImageMemo(dataUrl);
     const escala = Math.min(1, ANALISIS_MARCO_ANCHO / img.naturalWidth);
     const w = Math.max(1, Math.round(img.naturalWidth * escala));
     const h = Math.max(1, Math.round(img.naturalHeight * escala));
-    const canvas = canvasCon(w, h); // SPRINT-A A3 — factory
+    const canvas = canvasCon(w, h);
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return null;
     ctx.drawImage(img, 0, 0, w, h);

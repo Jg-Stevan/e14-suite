@@ -185,6 +185,12 @@ export interface FlagsApp {
   // (o el par fiducial inferior) cuenta como evidencia de que el pie está en la
   // foto. Default true; false = comportamiento anterior byte a byte.
   bandaInferiorOcr: boolean; // default true
+  // ─── KIT escaneo-compartido-v1 — campo ADITIVO AL FINAL (D57): la vía
+  // IMPORTAR detecta si el archivo YA es un escaneo (scanner/PDF plano) y, en
+  // ese caso, usa el frame completo como quad (sin worker/Sobel) y el MARCO
+  // IMPRESO del formulario como gate (mismo motor que la masiva, ahora en el
+  // paquete). true = ON; false = camino de siempre byte a byte (fotos).
+  escaneoIdentidad: boolean; // default true
 }
 
 export interface ReporteSesion {

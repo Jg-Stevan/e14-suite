@@ -36,7 +36,8 @@ import type { OrigenQuad } from "@jg-stevan/scanner-core/core/image-processor";
 // heurístico del runner MASIVA) viaja en opciones SOLO para MASIVA — SIM y
 // el flujo individual JAMÁS lo traen (el gate de escaneos no les aplica).
 // R7b (M10): el TIPO vive en types.ts (fin de la dependencia invertida
-// núcleo→masiva); el DETECTOR sigue en masiva/origen.ts.
+// núcleo→masiva); el DETECTOR vive en el paquete
+// (`dominio/origen-escaneo.ts` — KIT escaneo-compartido-v1).
 
 /** Página de mesa a la que apunta el próximo escaneo (D7: vive en el store). */
 export interface PaginaObjetivo {
@@ -66,9 +67,10 @@ export interface OpcionesEscaneo {
    *  enviada / EN_REVISION_HUMANA / RECHAZADA) lo decide `evaluarGate`. */
   scoreSimulado?: number;
   /** D63-A/D63-C — KIT e63a-origen-escaneo-v1: origen del archivo según el
-   *  detector heurístico (masiva/origen.ts). SOLO MASIVA lo llena (runner).
-   *  "escaneo" activa el quad página-completa (T1) y el gate del marco
-   *  impreso (T2) del kit D63-C; fotos/SIM/ausente = pipeline de siempre. */
+   *  detector heurístico (`dominio/origen-escaneo.ts` del paquete). SOLO
+   *  MASIVA lo llena (runner). "escaneo" activa el quad página-completa (T1)
+   *  y el gate del marco impreso (T2) del kit D63-C; fotos/SIM/ausente =
+   *  pipeline de siempre. */
   origenActa?: OrigenActa;
   /** e66 (P4) — señal AUDITABLE del detector (veredictoOrigen.senales — el
    *  runner ya la tenía en la traza y en el diagnóstico; ahora también viaja

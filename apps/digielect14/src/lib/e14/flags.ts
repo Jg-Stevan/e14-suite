@@ -176,6 +176,10 @@ export const FLAGS_DEFAULT: FlagsApp = {
   // fiducial inferior también cuenta como evidencia física. Default ON;
   // override false = camino anterior byte a byte.
   bandaInferiorOcr: true,
+  // KIT escaneo-compartido-v1: la vía IMPORTAR identifica los archivos que ya
+  // son escaneos (detector D63-A portado al paquete) — frame completo como
+  // quad y marco impreso como gate. Kill-switch: false = camino de siempre.
+  escaneoIdentidad: true,
 };
 
 /** Último flags.json bueno (null = nunca llegó). */
@@ -298,6 +302,8 @@ export function sanearFlags(o: unknown): Partial<FlagsApp> {
   if (typeof p.fusion_evidencia === "boolean") limpio.fusion_evidencia = p.fusion_evidencia;
   // KIT e14-seccion-inferior-banda-v1 — whitelist aditiva (booleano).
   if (typeof p.bandaInferiorOcr === "boolean") limpio.bandaInferiorOcr = p.bandaInferiorOcr;
+  // KIT escaneo-compartido-v1 — whitelist aditiva (booleano).
+  if (typeof p.escaneoIdentidad === "boolean") limpio.escaneoIdentidad = p.escaneoIdentidad;
   return limpio;
 }
 

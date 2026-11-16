@@ -71,6 +71,9 @@ const decodesEnVuelo = new Map<string, Promise<HTMLImageElement>>();
  *  canvas; el full-res base vive solo en lruDecodes). Tope 2, misma RAM
  *  acotada: el canvas es copia, el img base manda. */
 const lruCanvasEscalado = new Map<string, HTMLCanvasElement>();
+/** URLs blob: creadas por decodeImagenLruDeBlob (para revocar al desalojar —
+ *  sin esto el object URL retiene los bytes del File en RAM indefinidamente). */
+const blobsConUrl = new Map<string, Blob>();
 
 /** Núcleo del LRU: decode único de `url` (dataURL, blob: URL o http(s) —
  *  MISMO decode que haría `loadImage`, cero cambio de comportamiento). */
@@ -92,6 +95,23 @@ async function decodeLru(url: string): Promise<HTMLImageElement> {
         const masVieja = lruDecodes.keys().next().value;
         if (masVieja === undefined) break;
         lruDecodes.delete(masVieja);
+        // Disciplina de RAM: los object URL de blob: creados aquí se revocan
+        // al desalojar (el <img> ya decodificado NO se invalida — revocar
+        // solo libera los bytes del File).
+        if (blobsConUrl.has(masVieja)) {
+          // Además de revocar, se borra la entrada del WeakMap blob→url: si
+          // queda, la próxima llamada con la MISMA instancia de File
+          // re-obtiene la URL ya revocada → loadImage falla y los catch
+          // degradan la etapa en silencio.
+          const blobEvictado = blobsConUrl.get(masVieja);
+          if (blobEvictado) blobUrls.delete(blobEvictado);
+          try {
+            URL.revokeObjectURL(masVieja);
+          } catch {
+            /* URL ya revocada — noop */
+          }
+          blobsConUrl.delete(masVieja);
+        }
       }
       return img;
     })
@@ -144,6 +164,28 @@ export async function decodeImagenLru(
   }
   return cv;
 }
+
+/**
+ * Decode del File/Blob del pipeline a través del MISMO LRU 2 + dedup en
+ * vuelo (port de supervision-e14 `decodeImagenLruDeBlob`, SPRINT-A A1).
+ * Un object URL POR INSTANCIA de blob (WeakMap — URL.createObjectURL es
+ * barato y SIN decode; el decode real pega al LRU compartido). La misma
+ * instancia de File dentro de un intento (origen → preProceso → maestro)
+ * comparte UN decode; la revocación vive en la eviction del LRU.
+ */
+export function decodeImagenLruDeBlob(
+  blob: Blob,
+  opciones?: { maxDim?: number },
+): Promise<CanvasImageSource> {
+  let url = blobUrls.get(blob);
+  if (!url) {
+    url = URL.createObjectURL(blob);
+    blobUrls.set(blob, url);
+    blobsConUrl.set(url, blob);
+  }
+  return decodeImagenLru(url, opciones);
+}
+const blobUrls = new WeakMap<Blob, string>();
 
 // ─── SPRINT-A (perf/decode-once-v1) A3 — factory de canvas + análisis ───────
 

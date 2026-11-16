@@ -44,13 +44,16 @@ import {
 } from "@jg-stevan/scanner-core/dominio/completitud";
 // KIT e14-gate-v2 (FASE G2): marcador OBLIGATORIO de votos.
 import { medirZonaVotos } from "@jg-stevan/scanner-core/dominio/marcadores";
-// D63-C — KIT e63c: detector del MARCO IMPRESO (solo escaneos).
+// D63-C — KIT e63c: detector del MARCO IMPRESO (solo escaneos). KIT
+// escaneo-compartido-v1: vive en el paquete (misma regla que digielect14).
 import {
   evaluarMarcoImpreso,
+  marcoPerdonadoPorLectura,
   type MarcoEscaneo,
-  type MarcoImpreso,
-} from "./marco-escaneo";
-import type { NivelLectura } from "@jg-stevan/scanner-core/dominio/senal-lectura";
+} from "@jg-stevan/scanner-core/dominio/marco-escaneo";
+// Re-export para el bridge (scanner-core-bridge.ts) — la firma pública del
+// módulo no cambia aunque la implementación viva en el paquete.
+export { marcoPerdonadoPorLectura };
 import { DETALLE_ILEGIBLE, resolverDesenlace } from "./gate";
 import { calidadDeActa, type InfoCrop } from "./calidad";
 import type { Acta, DiagnosticoActa, ProgresoAnalisis } from "./types";
@@ -256,19 +259,10 @@ export type OpcionesEscaneoConTimeout = OpcionesEscaneo & {
  *  «la lectura perdona al marco, NO al contenido faltante». completo/ceñido/
  *  no-encontrado nunca bloquean por construcción (el perdón no aplica).
  *
- *  REV.2 — el gate F0.2 rev.1 (d671c29) tenía la polaridad INVERTIDA: el
- *  ternario del bridge negaba el trío (`!(FUERTE && !faltaSeccion)`), con lo
- *  cual el caso P2 (cortado+FUERTE+secciones) quedaba RECHAZADA INCOMPLETA y
- *  los MEDIA/DEBIL/SIN pasaban el gate del marco — exacto al revés de la
- *  doctrina (comentario del sitio, REPORTE-e63d §F0.2 y tabla §3-A).
- *  Exportado (patrón D-5) para el QA headless del kit e63e §4.2. */
-export function marcoPerdonadoPorLectura(
-  veredicto: MarcoImpreso,
-  nivelLectura: NivelLectura,
-  faltaSeccion: boolean,
-): boolean {
-  return veredicto === "cortado" && nivelLectura === "FUERTE" && !faltaSeccion;
-}
+ *  KIT escaneo-compartido-v1: la implementación se MUDÓ al paquete
+ *  (`dominio/marco-escaneo.ts`) para que el móvil y la masiva compartan la
+ *  MISMA regla; se re-exporta arriba (patrón D-5 — el QA del kit e63e §4.2 y
+ *  el bridge la importan igual que antes). */
 
 /** Pipeline §5 (ARCHIVO y CAMARA comparten etapas y mapeo; ms por etapa en consola). */
 export async function correrPipelineL2(

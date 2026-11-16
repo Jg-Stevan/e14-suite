@@ -42,7 +42,10 @@ import {
 // del ciclo store↔runner↔precalor). El resto de helpers del store sigue
 // importándose de ./store hasta su propio split (dedup-marcas/dedup-índice).
 import { storeMasiva } from "./store-api";
-import { clasificarOrigenDeArchivo, type OrigenVeredicto } from "./origen"; // D63-A — detector de origen (kit e63a-origen-escaneo-v1)
+import {
+  clasificarOrigenDeArchivo,
+  type OrigenVeredicto,
+} from "@jg-stevan/scanner-core/dominio/origen-escaneo"; // D63-A — detector de origen (KIT escaneo-compartido-v1: vive en el paquete)
 // WAVE3 §B — ORDEN-WAVE3-remoto-rescate-obs-v1: predicado PURO del rescate
 // anti-falso-rechazo (RECHAZADA-BAJO intermitente — reintento, no rotaciones).
 import { procedeRescateRechazo } from "./rescate";

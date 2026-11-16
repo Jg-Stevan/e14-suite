@@ -1,11 +1,12 @@
 /** KIT e63a-origen-escaneo-v1 (D63-A): detector heurístico del ORIGEN del
- *  archivo MASIVA — «escaneo» (scanner/PDF de página plana) vs «foto»
- *  (cámara). Evidencia: informe prod 20261020-122235 — las 8 páginas de PDF
- *  escaneadas cayeron 4× BAJO 4.9 / 2× INCOMPLETA / 1× ADVERTENCIA con quad
- *  sobel en 3/8: el pipeline está afinado para FOTOS y no había forma de
- *  SABER cuál archivo era cuál. Este módulo SOLO INSTRUMENTA (kit §0):
- *  alimenta las trazas (T2) y el informe (T3) para calibrar D63-B (deskew)
- *  y D63-C (quad/gate de escaneo). JAMÁS decide score/gate/veredictos.
+ *  archivo — «escaneo» (scanner/PDF de página plana) vs «foto» (cámara).
+ *  COMPARTIDO en el paquete (port literal de supervision-e14
+ *  `lib/e14/masiva/origen.ts`): la vía IMPORTAR del móvil y el runner masivo
+ *  deciden con la MISMA regla. Evidencia: informe prod 20261020-122235 — las
+ *  8 páginas de PDF escaneadas cayeron 4× BAJO 4.9 / 2× INCOMPLETA /
+ *  1× ADVERTENCIA con quad sobel en 3/8: el pipeline está afinado para FOTOS
+ *  y no había forma de SABER cuál archivo era cuál. El detector SOLO aporta
+ *  el ORIGEN: el producto decide qué camino toma con esa señal.
  *
  *  Señales (kit T1 — conservador):
  *  1. EXIF de cámara (Make/Model/DateTimeOriginal — los escaneos no traen).
@@ -24,16 +25,10 @@
  *  (borde-blanco con forma absurda) sigue en null, no en escaneo.
  *  Fallar (decode sin canvas, bytes raros, excepción) → null — el detector
  *  JAMÁS tumba el pipeline (misma filosofía del thumb cosmético). */
+import { canvasCon, decodeImagenLruDeBlob } from "./image-utils";
 
-// D63-A (kit e63a-origen-escaneo-v1) — R7b (M10): el TIPO OrigenActa vive
-// en ../types (fin de la dependencia invertida núcleo→masiva). R8: este
-// módulo solo lo CONSUME — el re-export temporal se retiró (deskew.ts y
-// runner.ts importan sus piezas directas del módulo canónico). El resto de
-// este módulo (detector EXIF/bordes — instrumentación SOLO del runner
-// MASIVA) NO se toca.
-import type { OrigenActa } from "../types";
-
-import { canvasCon, decodeImagenLruDeBlob } from "../image-utils"; // SPRINT-A A1/A3 — decode-once LRU + factory de canvas
+/** Origen del archivo (mismo literal que el dominio de la masiva). */
+export type OrigenActa = "escaneo" | "foto" | null;
 
 /** Veredicto del detector + señales auditables (traza de POR QUÉ decidió). */
 export interface OrigenVeredicto {
@@ -77,10 +72,9 @@ const RATIO_HOJA_MAX = 0.87;
  *  es alargado (ratio ≈ 0.31: actas impresas de sangre, no carta). HOY cae
  *  fuera del guard (0.58–0.87) → los escaneos del E-14 caen null aunque
  *  traigan borde-blanco, y sin borde-blanco ni se consideran. La relajación
- *  del guard es SOLO para la forma del E-14 (calibración declarada en el
- *  REPORTE): la banda clásica SIN borde-blanco NO se relaja — una imagen
- *  sin-EXIF con forma de foto estándar (WhatsApp 4:3/16:9) sigue en null
- *  honesto (pipeline foto, desenlaces intactos — invariancia de la Fase E). */
+ *  del guard es SOLO para la forma del E-14: la banda clásica SIN
+ *  borde-blanco NO se relaja — una imagen sin-EXIF con forma de foto
+ *  estándar (WhatsApp 4:3/16:9) sigue en null honesto. */
 const RATIO_E14_MIN = 0.22;
 const RATIO_E14_MAX = 0.45;
 
@@ -97,12 +91,11 @@ const UMBRAL_TINTA_FILO = 150;
  *  sombra tenue no alcanza). */
 const FILO_TINTA_MIN = 0.25;
 
-/** (F1.1 — calibración declarada en el REPORTE) El lado del filo cuenta SOLO
- *  si es MIXTO: tinta ≥25% Y papel claro ≥10%. La firma del plan es
- *  «contenido pegado al filo» = trazo impreso CORTADO sobre papel (mezcla
- *  tinta+papel). Un fondo oscuro UNIFORME (mesa/sombra incluida en la foto)
- *  no tiene papel en la franja → NO cuenta (protege las fotos sin-EXIF con
- *  fondo oscuro — la banda clásica queda null como hoy). */
+/** (F1.1 — calibración) El lado del filo cuenta SOLO si es MIXTO: tinta ≥25%
+ *  Y papel claro ≥10%. La firma del plan es «contenido pegado al filo» =
+ *  trazo impreso CORTADO sobre papel (mezcla tinta+papel). Un fondo oscuro
+ *  UNIFORME (mesa/sombra incluida en la foto) no tiene papel en la franja →
+ *  NO cuenta (protege las fotos sin-EXIF con fondo oscuro). */
 const FILO_CLARO_MIN = 0.1;
 
 /** Papel = luminancia ≥ este valor (blanco del papel impreso). */
@@ -319,7 +312,7 @@ export function tintaAlFiloSimetrica(b: OrigenBitmap): boolean {
   return vertical || horizontal;
 }
 
-/** Decisión (kit T1 + KIT e63d F1.2) — SOLO de señales, jamás de score/gate:
+/** Decisión (kit T1 + KIT e63d F1.2) — SOLO de señales:
  *  «foto» si EXIF de cámara · «escaneo» si sin-EXIF Y cualquiera de:
  *  (1) tinta-al-filo simétrica (escaneo CEÑIDO — firma del plan),
  *  (2) borde-blanco + forma de hoja (clásico — ahora también la forma
@@ -360,17 +353,11 @@ export function clasificarOrigen(
 }
 
 /** Bitmap de análisis: decode directo del navegador a BITMAP_LADO de ancho
- *  (createImageBitmap reescala en el mismo decode — el alto sale
- *  proporcional). Cualquier fallo (HEIC sin conversión, canvas caído) → null
- *  — el detector es cosmético, jamás tumba el desenlace.
- *  SPRINT-A (perf/decode-once-v1) A1: el decode pega al LRU COMPARTIDO del
- *  pipeline (`decodeImagenLruDeBlob`) — antes era un createImageBitmap
- *  privado {resizeWidth: BITMAP_LADO}. Geometría replicada: ancho EXACTO
- *  BITMAP_LADO (resizeWidth no clampea — también upscale), alto proporcional;
- *  el reescalado ocurre ahora en el drawImage con el suavizado default del
- *  navegador (mismo que usaba el bitmap nativo por defecto). El análisis es
- *  cosmético (D63-A: jamás tumba el pipeline) y el decode full-res se
- *  comparte con preProceso/maestro del MISMO File. */
+ *  (el alto sale proporcional). Cualquier fallo (HEIC sin conversión,
+ *  canvas caído) → null — el detector jamás tumba el desenlace.
+ *  El decode pega al LRU COMPARTIDO del pipeline (`decodeImagenLruDeBlob`)
+ *  — el mismo File que luego decodifican preProceso/maestro comparte el
+ *  decode full-res (SPRINT-A A1). */
 async function bitmapDeArchivo(archivo: Blob): Promise<OrigenBitmap | null> {
   try {
     const fuente = await decodeImagenLruDeBlob(archivo);
@@ -378,7 +365,7 @@ async function bitmapDeArchivo(archivo: Blob): Promise<OrigenBitmap | null> {
     const canvas = canvasCon(
       BITMAP_LADO,
       Math.max(1, Math.round((img.naturalHeight * BITMAP_LADO) / (img.naturalWidth || 1))),
-    ); // SPRINT-A A3 — factory
+    );
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) {
       return null;
@@ -391,10 +378,10 @@ async function bitmapDeArchivo(archivo: Blob): Promise<OrigenBitmap | null> {
   }
 }
 
-/** Punto ÚNICO que llama el runner (kit §1: una vez por fila, al inicio del
- *  pipeline). EXIF primero (si es de cámara no hace falta decode); el
- *  análisis de bordes solo corre cuando la duda existe. TODO guardado: el
- *  peor desenlace posible es un origen null (duda honesta). */
+/** Punto ÚNICO que llama el pipeline (una vez por archivo, al inicio).
+ *  EXIF primero (si es de cámara no hace falta decode); el análisis de
+ *  bordes solo corre cuando la duda existe. TODO guardado: el peor desenlace
+ *  posible es un origen null (duda honesta). */
 export async function clasificarOrigenDeArchivo(archivo: Blob): Promise<OrigenVeredicto> {
   try {
     const bytes = new Uint8Array(await archivo.slice(0, EXIF_SLICE_BYTES).arrayBuffer());
