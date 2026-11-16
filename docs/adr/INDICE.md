@@ -32,6 +32,14 @@ Estado de cada ADR: **VIGENTE** · **SUPERADA** (por cuál) · **OBSOLETA**.
 
 ## Huecos conocidos de la historia de decisiones (consolidación)
 
-- **Faltan**: D32 y D65–D74 (declarado en la auditoría; reconstruir de commits/kits).
+- **Faltan** (registro de supervision-e14): D32, D66–D71, D73 y D74 — declarado
+  en la auditoría; reconstruir de commits/kits. **D65 y D72 quedaron
+  reconstruidas el 2026-11-16** (R-07, auditoría) desde las citas del código:
+  D65 era la 15ª decisión más citada (68 refs, incluida el «umbral D65» de
+  Hamming ≤ 6 que cita el puente del móvil) y no tenía fila.
+- **Guard permanente**: `apps/supervision-e14/src/shared/docs/__tests__/adr-resolver.test.ts`
+  (suite del panel) exige que toda `D<n>` citada en `src/` de las dos apps y del
+  paquete resuelva en alguno de los dos registros del monorepo
+  (`docs/adr/README.md` de supervision o `docs/DECISIONS.md` de digielect14).
 - **Tope real**: D98 (dig) / D99 (worker puente). El índice consolidado debe
   llegar a D1–D99 con estado por decisión.

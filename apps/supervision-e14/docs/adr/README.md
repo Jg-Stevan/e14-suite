@@ -12,8 +12,11 @@ mandan sobre este documento.
 > siempre `Dxx-sup` o `Dxx-dig` (plan 2026-11-12 §0). El motor trasplantado cita
 > `Dxx` de su repositorio de origen (p. ej. D44, D57, D61, D63–D66, D74 y
 > D89-dig) que **no** son los de esta tabla.
-> Nunca confíes en el número sin leer el contexto. Faltan D32 y D65–D74: nunca se
-> escribieron aquí (D32 se perdió sin push).
+> Nunca confíes en el número sin leer el contexto. Faltan D32, D66–D71, D73 y
+> D74: nunca se escribieron aquí (D32 se perdió sin push). D65 y D72 quedaron
+> RECONSTRUIDAS el 2026-11-16 (R-07, auditoría) desde las citas del código; el
+> guard `src/shared/docs/__tests__/adr-resolver.test.ts` impide que vuelva a
+> citarse una D sin fila en algún registro del monorepo.
 
 ## Tabla de decisiones
 
@@ -83,6 +86,8 @@ mandan sobre este documento.
 | D62 | Contraste biciclo en masiva | VIGENTE | NORMAL↔NEGATIVO solo en masiva; el trío del monitor no se toca. |
 | D63 | Editor de perspectiva 8 puntos | VIGENTE | Detección que solo propone, ROTAR reproyecta, DESHACER propio. |
 | D64 | Franja de metadata full-width | VIGENTE | Punto lleno, país en mayúsculas, código espaciado visual. |
+| D65 | KIT masiva-watchdog-dedup-v2 — watchdog 75 s + dedup perceptual v2 (RECONSTRUIDA 2026-11-16, R-07) | VIGENTE | El escaneo MASIVA jamás se cuelga para siempre: watchdog `WATCHDOG_MS=75_000` con `WATCHDOG_INTENTOS=2` y gracia de 5 s que mata la corrida, SUELTA el runtime OCR (release de cada sesión + singleton — `rapidocr.ts` del paquete) y deja la fila reintentable; relectura interna topada (`RELECTURA_TOPE_MS=45_000`, e63f) y re-warm del OCR tras el kill. Identidad de página del dedup v2 POR CONTENIDO con EXIF normalizada (`dedup.ts`): SHA-256 de bytes («instantanea sha256»), payload QR EXACTO (RED LINE 10) y respaldo perceptual dhash64 con Hamming ≤ 6 — el «umbral D65» que también cita el puente del móvil (`huellas.ts` de digielect14). La duplicada espera a su original con techo 10 min ≈ 4× peor caso del watchdog (`runner-dedup.ts`); señal de vida transitoria T3.1 (jamás IDB); traza dedup en el MISMO write del hash (contrato aditivo D57). Nunca se escribió aquí (se perdió con D32); reconstruida desde sus 68 citas — la 15ª más citada del código. |
+| D72 | KIT e14-masiva-formato-ancho-v1 — título compacto de la fila (RECONSTRUIDA 2026-11-16, R-07) | VIGENTE | `tituloDeActa` (`masiva/tipos.ts`) compone el título de la fila de Carga Masiva en formato compacto para pantalla ancha: «{dep.codigo} - {país/municipio} - {lugar/puesto} - {tipo} - MESA {nnn} - PAG {i}/{t}». El store usa el formato compacto cuando `r.acta` existe; sin clasificación NUNCA hay título (sin join no se inventa texto — familia D88). Reconstruida desde las citas de `store.ts` y `tipos.ts`. |
 | D75 | Error real del bridge se reintenta | VIGENTE | Sesión OCR muerta es transitoria; mismo cupo y recuperación única. |
 | D76 | Sidecar nativo al repo | VIGENTE | Código y requirements versionados; `.gitattributes` protege binarios. |
 | D77 | Wasm desde R2 | SUPERADA por D80 | Pages corta en 25 MiB; R2 exigía consentimiento humano (API 10042). |
