@@ -177,6 +177,18 @@ export function reiniciarIndicePaginas(): void {
   HUELLAS_PAGINA.clear();
 }
 
+/** R-01 (auditoría 2026-11-16): vacía TODO el registro runtime — solo para
+ *  pruebas. El singleton del módulo vivía entre archivos de `bun test` (que
+ *  corre todas las suites en un mismo proceso): una suite que siembra actas
+ *  (p. ej. hub-local-drenaje) contaminaba a las siguientes y hacía el
+ *  resultado dependiente del ORDEN del readdir del clon. Cada suite llama
+ *  esto en `beforeEach` y siembra SU propio estado determinista. */
+export function vaciarActasRuntimeParaPrueba(): void {
+  RUNTIME.clear();
+  CLAVES_DEMO.clear();
+  HUELLAS_PAGINA.clear();
+}
+
 /** Suscripción a publicaciones (patrón del módulo: sin libs nuevas). */
 export function suscribirseActasRuntime(oyente: Oyente): () => void {
   oyentes.add(oyente);

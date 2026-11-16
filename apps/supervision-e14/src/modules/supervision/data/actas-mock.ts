@@ -280,7 +280,7 @@ export function tieneActa(mesa: Mesa): boolean {
 
 const CACHE_ACTAS: Record<string, ActaMesa> = {};
 
-function clonarActa(acta: ActaMesa): ActaMesa {
+export function clonarActa(acta: ActaMesa): ActaMesa {
   return {
     ...acta,
     formularios: {

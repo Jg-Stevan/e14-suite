@@ -62,6 +62,7 @@ import { zonaDePuesto } from "../domain/zonas-emisor";
 import type { SupervisionRepository } from "./supervision-repository";
 import {
   aprobarActaMock,
+  clonarActa,
   confirmarRescanActaMock,
   obtenerActa,
   reportarAnomaliaActaMock,
@@ -815,7 +816,12 @@ function fusionarActaRuntime(
 
   // Encabezado impreso verbatim del runtime (se muestra, no se interpreta).
   acta.impresion = runtime.impresion;
-  return acta;
+  // H-01 (R-01, auditoría 2026-11-16): clonar en la FRONTERA. Sin esto,
+  // `impresion` queda aliasada al registro del runtime (y este, a su vez,
+  // al objeto que publicó el digitalizador) y un mutador externo corrompe
+  // el singleton en caché — el bug que cazaba M11 cuando otra suite
+  // sembraba el runtime antes que la suya.
+  return clonarActa(acta);
 }
 
 function coincide(puesto: Puesto, f: FiltrosPuestos | undefined): boolean {

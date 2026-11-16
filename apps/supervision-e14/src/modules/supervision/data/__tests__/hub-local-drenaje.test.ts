@@ -17,7 +17,7 @@
  * `window` + `localStorage` falsos con el mismo patrón de `hub-local.test.ts`
  * (instalados en `beforeAll`, restaurados en `afterAll`).
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
 import {
   estadoHubLocal,
@@ -25,7 +25,10 @@ import {
   sincronizarHubLocal,
 } from "../hub-local";
 import { consultarRecepciones, registrarRecepcion } from "../recepcion-log";
-import { consultarActaRuntime } from "../actas-runtime";
+import {
+  consultarActaRuntime,
+  vaciarActasRuntimeParaPrueba,
+} from "../actas-runtime";
 
 const ROMA = "88_495_010_02";
 
@@ -80,6 +83,14 @@ afterAll(() => {
 beforeEach(() => {
   reiniciarHubLocalParaPrueba();
   almacenFalso.clear();
+});
+
+// R-01 (auditoría 2026-11-16): esta suite SIEMBRA el singleton runtime
+// (sincronizarHubLocal publica actas) y `bun test` corre todos los archivos
+// en un mismo proceso — sin esta limpieza, el estado filtra a las suites
+// que corren después y el resultado depende del ORDEN del readdir.
+afterEach(() => {
+  vaciarActasRuntimeParaPrueba();
 });
 
 /** Una fila del hub con seq/mesa parametrizables. */
