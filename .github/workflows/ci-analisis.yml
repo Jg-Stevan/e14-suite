@@ -1,0 +1,51 @@
+# CI del análisis de grafo (R-41 — auditoría 2026-11-16 §6.7)
+# knip cayó por memoria en la auditoría y las fronteras de paquete quedaron
+# verificadas solo por muestreo; este gate las verifica por ANÁLISIS en
+# cada push/PR: cero aristas paquete→app (DIP: el motor jamás importa de
+# las apps) y cero ciclos entre árboles. Los ciclos INTERNOS de cada árbol
+# son informativos (documentados — ver la salida del script).
+name: ci — análisis de grafo (R-41)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/analisis-grafo.mjs"
+      - ".github/workflows/ci-analisis.yml"
+      - "apps/digielect14/src/**"
+      - "apps/digielect14/tsconfig.json"
+      - "apps/supervision-e14/src/**"
+      - "apps/supervision-e14/tsconfig.json"
+      - "packages/scanner-core/src/**"
+      - "packages/scanner-core/package.json"
+  pull_request:
+    paths:
+      - "scripts/analisis-grafo.mjs"
+      - ".github/workflows/ci-analisis.yml"
+      - "apps/digielect14/src/**"
+      - "apps/digielect14/tsconfig.json"
+      - "apps/supervision-e14/src/**"
+      - "apps/supervision-e14/tsconfig.json"
+      - "packages/scanner-core/src/**"
+      - "packages/scanner-core/package.json"
+
+permissions:
+  contents: read
+
+jobs:
+  analisis-grafo:
+    runs-on: ubuntu-latest
+    steps:
+      # Pines por SHA (R-13): un tag re-publicado jamás ejecuta código sin revisión.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.2"
+
+      # Sin `bun install` a propósito: el analizador usa SOLO node:fs/node:path
+      # (cero dependencias — la lección de knip por memoria fue el motivo del
+      # script propio). Si algún día el script pide dependencias, añadir aquí
+      # `bun install --frozen-lockfile`.
+      - name: gate de ciclos y DIP (falla si hay paquete→app o ciclos entre árboles)
+        run: bun scripts/analisis-grafo.mjs
