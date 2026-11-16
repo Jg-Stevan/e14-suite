@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Pines por SHA (R-13): un tag re-publicado jamás ejecuta código nuevo sin revisión.
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Historia completa: los secretos también se cuelan en commits viejos.
           fetch-depth: 0
@@ -42,7 +42,7 @@ jobs:
     name: vulnerabilidades de dependencias (bun audit)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
@@ -60,7 +60,7 @@ jobs:
     name: actions del CI pineadas por SHA (R-13)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # R-13 (H-31, auditoría 2026-11-16): 38 refs `uses:` iban por tag
       # mutable y 0 por SHA — si un tag se re-publica, el CI ejecuta código
