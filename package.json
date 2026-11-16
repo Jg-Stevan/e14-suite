@@ -17,5 +17,9 @@
     "verificar:panel": "cd apps/supervision-e14 && bun run verificar",
     "test:motor": "bun test packages/scanner-core",
     "build:panel": "cd apps/supervision-e14 && bun run build"
+  },
+  "overrides": {
+    "glob": "^14.0.2",
+    "minimatch": "^11.0.1"
   }
 }

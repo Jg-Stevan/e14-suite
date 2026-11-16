@@ -1,0 +1,57 @@
+# CI de seguridad — e14-suite (R-04 + recomendación del plan, auditoría 2026-11-16)
+#
+# Dos puertas que no existían y dejaron pasar 3 CVEs de toolchain y el riesgo
+# de secretos sin escaneo periódico:
+#
+#   1. bun audit    — vulnerabilidades conocidas de las dependencias del
+#                     workspace completo (NINGUNA auditoría previa la corrió
+#                     de forma continua; la A la corrió una sola vez).
+#   2. gitleaks     — escaneo de secretos en cada push/PR (el escaneo manual
+#                     del repo era fallback con historia recortada — ver
+#                     docs/archivo/gitleaks-2026-11-12.txt del panel).
+#
+# Corre en TODO push/PR (sin paths-filter): los secretos pueden colarse por
+# cualquier ruta y el lockfile cambia desde cualquier package.json.
+name: seguridad — gitleaks + bun audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: escaneo de secretos (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      # Pines por SHA (R-13): un tag re-publicado jamás ejecuta código nuevo sin revisión.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # Historia completa: los secretos también se cuelan en commits viejos.
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          # Sin GITHUB_TOKEN propio: el default de lectura basta para escanear.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  bun-audit:
+    name: vulnerabilidades de dependencias (bun audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.2"
+
+      - name: instalar workspaces (lockfile de la raíz)
+        run: bun install --frozen-lockfile
+
+      # Audita el workspace completo: toolchain dev/build incluida (los 3 CVEs
+      # de 2026-11 vivían ahí — knip/eslint/opennextjs — no en el bundle).
+      - name: bun audit (0 vulnerabilidades o rojo)
+        run: bun audit
