@@ -33,7 +33,14 @@ import type { DivipolBase } from "@jg-stevan/scanner-core/dominio/divipol";
 import { statusDeScore } from "@jg-stevan/scanner-core/dominio/types";
 import { DESCRYPTORES } from "./contrato-vectores";
 
-const RUTA_GOLDEN = new URL("../src/lib/e14/__fixtures__/contrato-motor.json", import.meta.url);
+// D-3 (R-02, auditoría 2026-11-16): la ruta vieja
+// (`../src/lib/e14/__fixtures__/contrato-motor.json`) murió con la
+// consolidación del monorepo — el golden vive en el PAQUETE desde la
+// consolidación y las apps ya no tienen `__fixtures__/`.
+const RUTA_GOLDEN = new URL(
+  "../../../packages/scanner-core/tests/fixtures/contrato-motor.json",
+  import.meta.url,
+);
 const RUTA_DIVIPOL = new URL("../public/e14/divipol.json", import.meta.url);
 
 const divipolCrudo = readFileSync(RUTA_DIVIPOL, "utf8");

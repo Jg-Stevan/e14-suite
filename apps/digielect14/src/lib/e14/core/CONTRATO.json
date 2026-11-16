@@ -7,11 +7,11 @@
   "nota": "Mapa v2.3: los 6 módulos COMPARTIDOS con supervision-e14 viven en el PAQUETE @jg-stevan/scanner-core (packages/scanner-core — su CONTRATO gobierna). Este contrato cubre SOLO los módulos D-only del digitalizador (sin contraparte en S: frame-loop, motion-stabilizer, pdf-export, pwa, quality, sensor-profiler).",
   "compartidos": [],
   "modulos": {
-    "frame-loop.ts": "8374163b244a6ba30d9f9bae38b1bea6",
+    "frame-loop.ts": "14447378909b5158c753b8d1e78cc6a9",
     "motion-stabilizer.ts": "03faeb0185b903dbe50f3803fb5e9b91",
-    "pdf-export.ts": "4b682f7c591ca7960f4cfb7a2e67b0a6",
-    "pwa.ts": "eb491c95f25d6bc7827a25d5ad9db69e",
-    "quality.ts": "490e545518a31fdcdf1a1fdbcf7015c4",
-    "sensor-profiler.ts": "65e512696d56ef0f356dbed08f737947"
+    "pdf-export.ts": "87dcb86fcfbe3d72203a7d2f62bf6019",
+    "pwa.ts": "16024611f23cd8b7eb8873a9c6784dfb",
+    "quality.ts": "b4106579c15af16b9bfdd4e22180183e",
+    "sensor-profiler.ts": "dc42f12e4d723cba255fd52e97b5674c"
   }
 }
