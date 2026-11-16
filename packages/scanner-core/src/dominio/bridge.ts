@@ -11,6 +11,15 @@
  * de e14 — SPEC-rediseno-enviada Rev. 2 §7).
  * Fuente: (diseño propio e14, D35 — el mock de la fase gráfica se retiró;
  * SIMULACIÓN = pipeline real sobre el acta incluida).
+ *
+ * R-24 (H-15 — absorción del fork del panel): E14Bridge y CompositeBridge
+ * son GENÉRICOS sobre (Opciones, TipoActa) para que cada app instancie con
+ * SU contrato local SIN copiar la clase (el fork manual del panel tenía un
+ * 86,2 % de similitud — auditoría 2026-11-12). Defaults = contrato base del
+ * paquete: digielect14 los usa tal cual; el panel (supervision-e14) extiende
+ * OpcionesEscaneo con los campos que SOLO su MASIVA inyecta y pasa su Acta
+ * propio (rechazo SUPERVISOR, tiempos MASIVA) — ver el adaptador fino del
+ * panel (apps/supervision-e14/.../lib/e14/bridge.ts).
  */
 import type { Acta, ProgresoAnalisis, FuenteCaptura, TipoPagina } from "./types";
 import type { PageFilter, Quad } from "../core/types";
@@ -48,9 +57,25 @@ export interface OpcionesEscaneo {
   onProgreso?: (p: ProgresoAnalisis) => void;
 }
 
-export interface E14Bridge {
+/**
+ * R-24 (H-15): lo MÍNIMO estructural que el enrutador lee del acta (los dos
+ * gates de foto D35). Es la restricción del parámetro `TipoActa`: cualquier
+ * acta con las dos fotos opcionales la cumple — el `Acta` del paquete (default)
+ * y el del panel (contratos de sitio aditivos) incluidos.
+ */
+export interface ActaMinima {
+  /** data URL cruda del frame/archivo. */
+  fotoOriginal?: string;
+  /** data URL warp+realce (la evidencia real). */
+  fotoProcesada?: string;
+}
+
+export interface E14Bridge<
+  Opciones extends OpcionesEscaneo = OpcionesEscaneo,
+  TipoActa extends ActaMinima = Acta,
+> {
   /** Analiza la imagen y resuelve con el acta resultante (async, §3.2). */
-  escanearActa(opciones: OpcionesEscaneo): Promise<Acta>;
+  escanearActa(opciones: Opciones): Promise<TipoActa>;
   /**
    * L5 (§7.5): re-ejecuta el pipeline §5 sobre `fotoOriginal` del acta con el
    * QUAD MANUAL (F5-MANUAL: respeta el quad al píxel, sin refine) → devuelve
@@ -60,7 +85,7 @@ export interface E14Bridge {
    * de recorte (undefined = conserva `acta.rotation`).
    */
   recortar(
-    acta: Acta,
+    acta: TipoActa,
     quad: Quad,
     onProgreso?: (p: ProgresoAnalisis) => void,
     rotacionOverride?: number,
@@ -71,14 +96,14 @@ export interface E14Bridge {
     // delegación y el escudo jamás se activaría (razonamiento del cambio).
     quadOrigen?: OrigenQuad | null,
     manual?: boolean,
-  ): Promise<Acta>;
+  ): Promise<TipoActa>;
   /**
    * F2 (§F2.2, D36): re-procesa la foto con el filtro elegido — IGUAL que
    * setFilterOnPage del core (apps/scanner-lab/…/store.ts L644-669): solo
    * processImage, SIN re-OCR ni re-calidad (el gate ya resolvió) → acta
    * actualizada (fotoProcesada + filtro).
    */
-  revelar(acta: Acta, filtro: PageFilter): Promise<Acta>;
+  revelar(acta: TipoActa, filtro: PageFilter): Promise<TipoActa>;
   /**
    * KIT camara-visor-v1 (G3 — upgrade silencioso del lab L1789-1842):
    * re-procesa el acta con una foto NUEVA a máxima resolución (la toma
@@ -88,15 +113,15 @@ export interface E14Bridge {
    * sensor ≠ preview — quads normalizados). El gate se re-evalúa completo.
    */
   mejorarResolucion(
-    acta: Acta,
+    acta: TipoActa,
     fotoNueva: string,
     onProgreso?: (p: ProgresoAnalisis) => void,
-  ): Promise<Acta>;
+  ): Promise<TipoActa>;
   /**
    * F-OCR del lab (EditorView.tsx L1360-1395): corre requestOcr sobre la
    * imagen PROCESADA del acta y devuelve el texto crudo.
    */
-  reconocerTexto(acta: Acta): Promise<string>;
+  reconocerTexto(acta: TipoActa): Promise<string>;
   /** HH:MM:SS — hora del envío automático. */
   horaEnvio(): string;
   /** HH:MM — hora de las filas del historial. */
@@ -113,10 +138,13 @@ function dosDigitos(n: number): string {
  * recortar mira la PRESENCIA DE FOTO, no la fuente.
  * get-bridge.ts sigue siendo el punto único de intercambio.
  */
-export class CompositeBridge implements E14Bridge {
-  constructor(private real: E14Bridge | null = null) {}
+export class CompositeBridge<
+  Opciones extends OpcionesEscaneo = OpcionesEscaneo,
+  TipoActa extends ActaMinima = Acta,
+> implements E14Bridge<Opciones, TipoActa> {
+  constructor(private real: E14Bridge<Opciones, TipoActa> | null = null) {}
 
-  escanearActa(opciones: OpcionesEscaneo): Promise<Acta> {
+  escanearActa(opciones: Opciones): Promise<TipoActa> {
     if (!this.real) {
       return Promise.reject(new Error("FUENTE REAL NO IMPLEMENTADA (L2)"));
     }
@@ -124,7 +152,7 @@ export class CompositeBridge implements E14Bridge {
   }
 
   recortar(
-    acta: Acta,
+    acta: TipoActa,
     quad: Quad,
     onProgreso?: (p: ProgresoAnalisis) => void,
     rotacionOverride?: number,
@@ -132,7 +160,7 @@ export class CompositeBridge implements E14Bridge {
     // KIT e14-esquinas-suaves-v1 (Q2): el composite REENVÍA manual (default
     // false — el escaneo/mejorar conservan el comportamiento conservador).
     manual = false,
-  ): Promise<Acta> {
+  ): Promise<TipoActa> {
     if (!this.real) {
       return Promise.reject(new Error("FUENTE REAL NO IMPLEMENTADA (L2)"));
     }
@@ -143,7 +171,7 @@ export class CompositeBridge implements E14Bridge {
     return this.real.recortar(acta, quad, onProgreso, rotacionOverride, quadOrigen, manual);
   }
 
-  revelar(acta: Acta, filtro: PageFilter): Promise<Acta> {
+  revelar(acta: TipoActa, filtro: PageFilter): Promise<TipoActa> {
     if (!this.real) {
       return Promise.reject(new Error("FUENTE REAL NO IMPLEMENTADA (L2)"));
     }
@@ -155,10 +183,10 @@ export class CompositeBridge implements E14Bridge {
   }
 
   mejorarResolucion(
-    acta: Acta,
+    acta: TipoActa,
     fotoNueva: string,
     onProgreso?: (p: ProgresoAnalisis) => void,
-  ): Promise<Acta> {
+  ): Promise<TipoActa> {
     if (!this.real) {
       return Promise.reject(new Error("FUENTE REAL NO IMPLEMENTADA (L2)"));
     }
@@ -169,7 +197,7 @@ export class CompositeBridge implements E14Bridge {
     return this.real.mejorarResolucion(acta, fotoNueva, onProgreso);
   }
 
-  reconocerTexto(acta: Acta): Promise<string> {
+  reconocerTexto(acta: TipoActa): Promise<string> {
     if (!this.real) {
       return Promise.reject(new Error("FUENTE REAL NO IMPLEMENTADA (L2)"));
     }
