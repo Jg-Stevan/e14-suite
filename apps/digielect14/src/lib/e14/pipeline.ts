@@ -29,7 +29,9 @@ import {
   tipoDeBanda,
 } from "@jg-stevan/scanner-core/dominio/clasificador";
 import { fusionar } from "@jg-stevan/scanner-core/dominio/fusion";
-import { lecturaParaFusion } from "./fusion-lectura";
+// R-25 (H-20): el adaptador lectura→fusion-lectura vive en el motor (fin del
+// duplicado byte a byte con supervision-e14) — mismo subpath que fusion.ts.
+import { lecturaParaFusion } from "@jg-stevan/scanner-core/dominio/fusion-lectura";
 import { procesadaVaciaDataUrl } from "@jg-stevan/scanner-core/dominio/image-utils";
 import {
   ESQUINAS_OK,

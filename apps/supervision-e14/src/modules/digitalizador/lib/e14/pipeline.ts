@@ -34,7 +34,9 @@ import {
 // acta ↔ DIVIPOL (T-11, espejo del PR #158 de dig). Invocado SOLO con el
 // kill-switch `fusion_evidencia` ON (default false ⇒ cero invocación).
 import { fusionar } from "@jg-stevan/scanner-core/dominio/fusion";
-import { lecturaParaFusion } from "./fusion-lectura";
+// R-25 (H-20): el adaptador lectura→fusion-lectura vive en el motor (fin del
+// duplicado byte a byte con digielect14) — mismo subpath que fusion.ts.
+import { lecturaParaFusion } from "@jg-stevan/scanner-core/dominio/fusion-lectura";
 // KIT e14-optimizacion-v1 (T1): memo FIFO tope 2 de image-utils.
 import { procesadaVaciaDataUrl } from "./image-utils";
 // GUARD-BORDE Rev. 2 (D1/D3): helper ÚNICO de completitud.
