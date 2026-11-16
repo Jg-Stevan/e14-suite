@@ -1,5 +1,7 @@
 # INFORME DE REMEDIACIÓN — e14-suite
 
+> **Nota post-cierre (2026-11-16):** este informe documenta la ejecución original (1.117 pruebas al cerrar el sprint 4). La **verificación independiente del cierre** — que saldó 3 huecos detectados (claim D-1, sabotaje R-39, handlers de promesa del guard) y re-ejecutó todo el apéndice con **1.123/1.123 pruebas** — está en `INFORME-VERIFICACION-CIERRE.md`, junto a este archivo.
+
 > **Ejecución completa del Plan de Remediación v2** (43 tareas + R-44 «micro-limpieza 2» + correcciones D-1…D-6 + gitleaks + SHA de despliegue).
 > **Base:** `f3d47f9` (hijo inmediato del commit auditado `107cc64`) · **Rama:** `remediacion/plan-2026-11`
 > **Resultado:** 41 commits convencionales en español · 276 archivos · +15.274/−8.580 líneas · **1.117/1.117 pruebas** · 0 vulnerabilidades · builds reales verdes.
