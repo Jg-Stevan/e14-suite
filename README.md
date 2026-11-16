@@ -1,6 +1,6 @@
 # e14-suite
 
-Monorepo del ecosistema E-14: **digitalización de actas de escrutinio, 100 % client-side**.
+Monorepo del ecosistema E-14: **digitalización de actas de escrutinio, procesado 100 % local**.
 
 ## Demos en vivo (Cloudflare Pages)
 
@@ -23,12 +23,28 @@ e14-suite/
                          apps vía @jg-stevan/scanner-core/* (workspace:*)
 ```
 
-## Por qué 100 % client-side (privacidad electoral)
+## Por qué procesado 100 % local (privacidad electoral)
 
-Las fotos de actas y los datos de jurados **jamás tocan un servidor de procesado**:
-la cascada OCR/QR corre en el navegador (WASM), la publicación es en memoria de
-sesión y la cola de sincronización firma cada envío. Los límites conocidos están
-declarados y son honestos — ver los README de cada app.
+El **procesado** es 100 % local: la cascada OCR/QR corre íntegramente en el
+navegador (WASM) y las fotos de actas y los datos de jurados **jamás tocan
+un servidor de procesado**. La foto ya procesada **sí viaja firmada (HMAC)
+al hub de producción** — el único destino externo del CSP — para que el
+panel de supervisión la reciba. Los límites conocidos están declarados y
+son honestos — ver los README de cada app.
+
+### Qué sale del dispositivo y qué se queda
+
+| Dato | ¿Sale del dispositivo? | Protección |
+| --- | --- | --- |
+| Foto procesada de la página del acta (`srcFoto`) | Sí — al hub de producción (`e14-puente`, Cloudflare Worker) | Firmada HMAC-SHA256 con re-firma en reintento y falla-cerrado sin clave de jornada; huellas SHA-256/dhash64/QR adjuntas |
+| Cifras, votos o interpretación del acta | No — la app no lee votos: solo cabecera e identificación | — |
+| Fotos SIN procesar (originales de cámara) | No — se descartan tras el pipeline | Solo en memoria/IDB local durante el procesado |
+| Claves de firma y de jornada | No — viven en localStorage del operador, jamás en el bundle | Falla-cerrado: sin clave no se envía nada |
+| OCR/QR (píxeles → texto) | No — corre íntegramente en el navegador (WASM) | Sin telemetría ni terceros (CSP deny-by-default) |
+
+> La fuente del hub vive fuera de este monorepo (paquete `e14-puente/`);
+> su contrato formal y el registro de su exclusión están en
+> `docs/adr/2026-11-16-contrato-hub-e14-puente.md`.
 
 ## Cómo correr
 
