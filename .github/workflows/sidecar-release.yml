@@ -28,6 +28,15 @@ name: Release sidecar nativo
 # El exe se firma con la clave del repositorio? NO. Queda sin firmar y SmartScreen
 # lo va a interrumpir la primera vez; la tarjeta ya lo dice en su texto. Firmar
 # cuesta un EV code signing cert y no entra en esta decisión.
+#
+# R-42 (auditoría 2026-11-16) — verificabilidad del binario publicado. Con los
+# pines exactos de R-08 (native/requirements.txt) quedaba la mitad del hueco
+# §6.8: el .exe que se distribuye. Este workflow además de empaquetar REGISTRA
+# la identidad del asset: SHA-256 del ZIP en `SHA256SUMS.txt` (adjunto a la
+# release y al artifact) e inventario recursivo con tamaños del bundle en
+# `INVENTARIO-BUNDLE.txt` (qué .dll/.pyd viajan dentro de los ~240 MiB). El
+# contrato verificable y sus límites honestos (PyInstaller NO es bit a bit
+# reproducible): `native/BUILD-REPRODUCIBLE.md`.
 
 on:
   workflow_dispatch:
@@ -85,6 +94,47 @@ jobs:
         working-directory: apps/supervision-e14
         run: node scripts/empaquetar-sidecar.mjs --sin-ejecutar
 
+      # R-42 — el asset publicado deja de ser opaco. El SHA-256 ya viajaba en el
+      # cuerpo de la release, pero un cuerpo se edita y un asset se re-sube:
+      # nada ataba el hash al archivo. Este paso registra la identidad del ZIP
+      # en archivos que viajan CON la release (sobreviven al log del runner):
+      #   · `SHA256SUMS.txt` — el contrato estándar (`sha256sum -c`).
+      #   · `INVENTARIO-BUNDLE.txt` — dir recursivo con tamaños del onedir:
+      #     trazabilidad de QUÉ código nativo (.dll/.pyd de onnxruntime/
+      #     opencv/numpy) viaja dentro del binario, con totales. El mismo
+      #     inventario se vuelca al log de esta corrida.
+      # El paso de publicación lee el hash de AQUÍ: un solo cálculo entre el
+      # cuerpo de la release y el adjunto — imposible que diverjan.
+      - name: Registrar SHA-256 + inventario del bundle (R-42)
+        working-directory: apps/supervision-e14
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          ZIP="supervision-e14-sidecar-win-x64.zip"
+          DIR="supervision-e14-sidecar"
+          echo "── SHA-256 del asset publicado ────────────────────────────"
+          sha256sum "$ZIP" | tee SHA256SUMS.txt
+          echo ""
+          echo "── DLLs/.pyd nativos del bundle ($DIR) ────────────────────"
+          find "$DIR" -type f \( -iname '*.dll' -o -iname '*.pyd' \) -printf '%10s  %p\n' | sort -k2
+          echo ""
+          echo "── Inventario completo (recursivo, con tamaños) ────────────"
+          find "$DIR" -type f -printf '%10s  %p\n' | sort -k2
+          {
+            echo "# Inventario del bundle onedir del sidecar (R-42 — supply chain)."
+            echo "# Generado por .github/workflows/sidecar-release.yml el $(date -u +%Y-%m-%dT%H:%M:%SZ)."
+            echo "# Formato: <bytes>  <ruta desde la raíz del bundle>. El SHA-256 del ZIP"
+            echo "# está en SHA256SUMS.txt; el contrato de reproducibilidad y cómo"
+            echo "# verificar una descarga, en native/BUILD-REPRODUCIBLE.md."
+            echo ""
+            find "$DIR" -type f -printf '%10s  %p\n' | sort -k2
+            echo ""
+            echo "archivos totales : $(find "$DIR" -type f | wc -l)"
+            echo "bytes totales    : $(find "$DIR" -type f -printf '%s\n' | awk '{s+=$1} END {print s}')"
+            echo "dll/pyd nativos  : $(find "$DIR" -type f \( -iname '*.dll' -o -iname '*.pyd' \) | wc -l)"
+          } > INVENTARIO-BUNDLE.txt
+
       - name: Publicar la release
         working-directory: apps/supervision-e14
         env:
@@ -96,7 +146,9 @@ jobs:
           set -euo pipefail
           TAG="sidecar-v${VERSION}"
           ZIP="dist/supervision-e14-sidecar-win-x64.zip"
-          sha=$(sha256sum "$ZIP" | cut -d' ' -f1)
+          # R-42: el hash sale del SHA256SUMS.txt del paso anterior — UN solo
+          # cálculo entre el cuerpo de la release y el adjunto.
+          sha=$(head -1 dist/SHA256SUMS.txt | cut -d' ' -f1)
           mib=$(( $(wc -c <"$ZIP") / 1048576 ))
           cat > cuerpo.md <<EOF
           Sidecar nativo del digitalizador E-14: det+rec de RapidOCR en CPU con
@@ -109,22 +161,30 @@ jobs:
           Primera corrida: 5-15 s (Defender escanea los 240 MiB recién escritos);
           después, 4,5-6,3 s hasta \`/salud\`.
 
-          **SHA-256:** \`$sha\`
+          **SHA-256:** \`$sha\` — también adjunto como \`SHA256SUMS.txt\`
+          (verificable con \`sha256sum -c\`). \`INVENTARIO-BUNDLE.txt\` (adjunto)
+          lista el contenido del ZIP con tamaños. Cómo reconstruir y qué es
+          verificable: \`native/BUILD-REPRODUCIBLE.md\`.
 
           **SmartScreen:** binario sin firmar → «Más información → Ejecutar de
           todas formas».
           EOF
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$ZIP" --clobber
+            gh release upload "$TAG" "$ZIP" dist/SHA256SUMS.txt dist/INVENTARIO-BUNDLE.txt --clobber
             gh release edit "$TAG" --notes-file cuerpo.md
           else
             args=(--title "Sidecar nativo $TAG" --notes-file cuerpo.md)
             [ "$PRERELEASE" = "true" ] && args+=(--prerelease)
-            gh release create "$TAG" "$ZIP" "${args[@]}"
+            gh release create "$TAG" "$ZIP" dist/SHA256SUMS.txt dist/INVENTARIO-BUNDLE.txt "${args[@]}"
           fi
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: supervision-e14-sidecar-win-x64
-          path: apps/supervision-e14/dist/supervision-e14-sidecar-win-x64.zip
+          # R-42: el hash y el inventario viajan también en el artifact — se
+          # puede verificar el ZIP sin abrir la release.
+          path: |
+            apps/supervision-e14/dist/supervision-e14-sidecar-win-x64.zip
+            apps/supervision-e14/dist/SHA256SUMS.txt
+            apps/supervision-e14/dist/INVENTARIO-BUNDLE.txt
           retention-days: 30
