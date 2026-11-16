@@ -109,3 +109,7 @@ public/models/rapidocr/*.onnx
 # Infraestructura del sandbox de desarrollo (NO es parte del producto)
 /.zscripts/
 /Caddyfile
+
+# R-36 — Playwright E2E: trazas/screenshots/reporte (solo se generan al correr)
+/e2e-reportes/
+/test-results/

@@ -1,0 +1,98 @@
+# CI E2E — golden path en navegador (R-36, auditoría 2026-11-16)
+#
+# Hasta R-36 NADIE había abierto la app en un navegador de CI: el humo del
+# golden path (carga → cámara → captura → OCR → envío) no existía en ninguna
+# puerta. Este workflow corre apps/digielect14/e2e/humo.spec.ts con
+# Playwright + Chromium contra el dev server (puerto 3111).
+#
+# POR QUÉ NO EN CADA PUSH: el costo lo exige — bajar el navegador (~170 MB),
+# los assets del motor (onnx ~16 MB + tessdata + opencv ~10,4 MB, cacheados
+# por lock) y el OCR real de la fixture (decenas de segundos de CPU). La
+# suite unitaria/vitest (452) y los QA siguen siendo la puerta de cada push
+# (ci-movil.yml); este humo corre NOCHE (03:00 UTC) y a demanda.
+#
+# Presupuesto de cámara del spec (D-6): la vía cámara usa el dispositivo
+# FALSO de Chromium (señal verde sintética — humo de permisos+stream+frame
+# loop); el OCR real se ejerce por la vía ARCHIVO con una fixture sintética.
+# La cámara física de campo sigue siendo validación de dispositivo
+# (REPORTE-validacion-dispositivo-*).
+#
+# Mínimo privilegio: contents: read. Pines por SHA (R-13) igual que el resto
+# de workflows de la raíz.
+name: e2e — humo golden path (digielect14)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Diario 03:00 UTC (22:00 Bogotá) — nocturno, fuera del hot path.
+    - cron: "0 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-e2e
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    name: Playwright (chromium) — humo golden path
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/digielect14
+    steps:
+      # Pines por SHA (R-13): un tag re-publicado jamás ejecuta código sin revisión.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.2"
+
+      - name: instalar workspaces (lockfile de la raíz)
+        working-directory: .
+        run: bun install --frozen-lockfile
+
+      # Assets del motor (onnx/tessdata/opencv — NO versionados): mismo cache
+      # por lock de assets que ci-movil.yml. `preparar` debajo verifica los
+      # SHA-256 y descarga lo que falte (con cache acertado es casi no-op).
+      - name: Cache de assets externos
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            apps/digielect14/public/models/rapidocr/*.onnx
+            apps/digielect14/public/models/tess/**/*.traineddata.gz
+            apps/digielect14/public/vendor/opencv-4.12.0-core.js
+            apps/digielect14/public/vendor/onnxruntime/**
+            apps/digielect14/public/vendor/tesseract/**
+          key: assets-movil-${{ runner.os }}-${{ hashFiles('apps/digielect14/scripts/assets.lock.json') }}
+
+      # Cache del navegador de Playwright (~170 MB): la versión del binario
+      # la fija el lockfile (@playwright/test en apps/digielect14).
+      - name: Cache de navegadores Playwright
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+
+      - name: materializar assets del motor (preparar)
+        run: bun run preparar
+
+      - name: instalar Chromium (--with-deps)
+        run: bunx playwright install --with-deps chromium
+
+      # El webServer de playwright.config.ts levanta `next dev` en 3111
+      # (CI=true → nunca reusa uno existente). Trace/screenshot quedan en
+      # e2e-reportes/ con retain-on-failure.
+      - name: correr E2E (humo golden path)
+        run: bunx playwright test --project=chromium
+
+      - name: publicar reporte y trazas (solo en fallo)
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-humo-${{ github.sha }}
+          # trace/screenshot (retain-on-failure) + reporte HTML del spec.
+          path: apps/digielect14/e2e-reportes/
+          retention-days: 14
+          if-no-files-found: ignore
