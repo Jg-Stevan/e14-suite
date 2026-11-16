@@ -208,8 +208,12 @@ self.addEventListener("fetch", (event) => {
   }
 
   // 3) Resto del mismo origen → STALE-WHILE-REVALIDATE.
-  // A6 (lab): descargas grandes de artefactos NO se cachean.
-  if (url.pathname.includes("/downloads/")) return;
+  // A6 (lab) + R-17 (H-49, auditoría 2026-11-16): descargas grandes de
+  // artefactos NO se cachean. El guard viejo excluía /downloads/ (ruta que
+  // NO existe en este producto): las descargas REALES son el sidecar en
+  // /descargas/sidecar/ (acelerador.tsx URL_DESCARGA_SIDECAR) — sin este
+  // guard un binario de ~100 MB llenaba el caché runtime en cada descarga.
+  if (url.pathname.startsWith("/descargas/")) return;
   event.respondWith(
     (async () => {
       const cache = await caches.open(RUNTIME_CACHE);

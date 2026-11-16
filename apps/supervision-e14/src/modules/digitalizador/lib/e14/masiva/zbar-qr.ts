@@ -3,7 +3,9 @@
  *
  * Evidencia del laboratorio de benchmark (12 imágenes reales E-14: 6 fotos de
  * cámara 4000×3000 con acta rotada 90° + 6 páginas de escáner ~1100×3700,
- * corrida 3× reproducible — docs/REPORTE-e75-qr-zoom-zbar-v1.md):
+ * corrida 3× reproducible — REPORTE-e75 del lab de ORIGEN, que NO viajó al
+ * monorepo (H-47/R-17, auditoría 2026-11-16: la cita vieja apuntaba a un
+ * docs/ inexistente):
  * · zbar leyó 2 actas que NINGÚN otro lector vio en NINGUNA variante
  *   (p2 solo zbar@zoom1024 · p4 solo zbar@zoom640) — el finder por scanlines
  *   de ZBar es complementario al de ZXing/jsQR en impresiones degradadas.

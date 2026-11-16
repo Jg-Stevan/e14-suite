@@ -75,9 +75,11 @@ iPhone en runtime. `@testing-library/*`: el test de componente está INACTIVO
 por bloqueos documentados (`src/lib/e14/__tests__/review-view.copy.test.ts` y
 `docs/PENDIENTES-INTEGRACION.md`).
 
-Adición justificada (knip la destapó): `@playwright/test` entra a
-devDependencies — `e2e/humo.spec.ts` ya lo importaba SIN declarar (dependía de
-`bunx` temporal); ahora el contrato de dependencias del e2e es explícito.
+Corregido por R-17 (H-50, auditoría 2026-11-16): este párrafo citaba un
+`e2e/humo.spec.ts` que NO existe en el monorepo (era del repo pre-consolidación
+y dependía de `bunx` temporal). El E2E real del golden path llega con R-36
+(`apps/digielect14/e2e/humo.spec.ts` + playwright.config.ts); cuando llegue,
+`@playwright/test` entra a devDependencies con contrato explícito.
 
 Verificación: `bunx knip` → **exit 0** (63 líneas de avisos warn documentados
 en esta sección) · `bun run lint` → 0 errores · `bunx tsc --noEmit` → 0 errores.

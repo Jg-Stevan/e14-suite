@@ -364,7 +364,8 @@ export const QR_ZOOM_LADO_ALT = 640;
  * QR conserva píxeles nativos: escalar la página COMPLETA a 2048 encoge los
  * módulos ~3×; recortar la banda y escalar SOLO la banda los conserva).
  *
- * Receta EXACTA del lab (docs/REPORTE-e75 §5 — medida píxel a píxel):
+ * Receta EXACTA del lab (REPORTE-e75 §5 del repo de ORIGEN — no viajó al
+ * monorepo, H-47/R-17 — medida píxel a píxel):
  * fetch(dataURL)→blob→createImageBitmap + OffscreenCanvas (fallback
  * HTMLCanvasElement). DESVIACIÓN DECLARADA verificada en el banco: la MISMA
  * banda dibujada desde <img>+HTMLCanvasElement difiere de la de
