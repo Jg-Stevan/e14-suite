@@ -111,7 +111,7 @@ interface ArbolVisor {
 }
 
 /** Bloque máquina del snapshot (el único contrato que el modo cruce re-parsea). */
-interface Snapshot {
+export interface Snapshot {
   kind: "snapshot-divipola-exterior";
   version: 1;
   generado: string;
@@ -145,8 +145,11 @@ const sha256 = (texto: string): string =>
   createHash("sha256").update(texto, "utf8").digest("hex");
 
 /** Clave y orden de campos FIJOS → serialización canónica comparable entre
- * catálogo y fuente oficial (una diferencia semántica = digest distinto). */
-function canonico(registros: readonly RegistroOficial[]): string {
+ * catálogo y fuente oficial (una diferencia semántica = digest distinto).
+ * Exportada SOLO para el test de sabotaje (R-39): el drift-congelado es un
+ * gate de seguridad electoral y su detector debe estar ejercitado por la
+ * suite — una regresión silenciosa aquí dejaría el gate decorativo. */
+export function canonico(registros: readonly RegistroOficial[]): string {
   const ordenados = [...registros].sort((a, b) =>
     a.idEnlace < b.idEnlace ? -1 : a.idEnlace > b.idEnlace ? 1 : 0
   );
@@ -312,8 +315,9 @@ function validarEstructura(brutos: unknown[]): ResultadoEstructura {
 const MARCADOR_FENCE = "snapshot-divipola-exterior";
 
 /** El snapshot vive en un fence ```json del doc de archivo; el bloque se
- * identifica por su campo `kind` (mismo marcador que la constante). */
-function parsearSnapshot(doc: string): Snapshot | null {
+ * identifica por su campo `kind` (mismo marcador que la constante).
+ * Exportada SOLO para el test de sabotaje (R-39). */
+export function parsearSnapshot(doc: string): Snapshot | null {
   const fences = doc.match(/```json\s*\n([\s\S]*?)```/g) ?? [];
   for (const fence of fences) {
     const cuerpo = fence.replace(/^```json\s*\n/, "").replace(/```\s*$/, "");
@@ -327,7 +331,10 @@ function parsearSnapshot(doc: string): Snapshot | null {
   return null;
 }
 
-function verificarDrift(snapshot: Snapshot, registros: RegistroDivipolaJson[]): string[] {
+/** Comparación de digest canónico contra el snapshot congelado. Exportada
+ * SOLO para el test de sabotaje (R-39): el caso «catálogo alterado» y el
+ * caso «snapshot alterado» se congelan en la suite. */
+export function verificarDrift(snapshot: Snapshot, registros: RegistroDivipolaJson[]): string[] {
   const lineas: string[] = [];
   const canonicoActual = sha256(canonico(registros));
   if (canonicoActual === snapshot.catalogo.sha256_canonico) {
@@ -607,9 +614,14 @@ ${JSON.stringify(s, null, 2)}
 `;
 }
 
-main()
-  .then((codigo) => process.exit(codigo))
-  .catch((error) => {
-    console.error(`✗ error de ejecución: ${(error as Error).stack ?? error}`);
-    process.exit(2);
-  });
+// Solo corre el gate cuando el script se invoca como CLI — la importación
+// del módulo (para el test de sabotaje R-39) NO debe disparar descargas en
+// vivo ni process.exit() que mataría el test runner.
+if (import.meta.main) {
+  main()
+    .then((codigo) => process.exit(codigo))
+    .catch((error) => {
+      console.error(`✗ error de ejecución: ${(error as Error).stack ?? error}`);
+      process.exit(2);
+    });
+}
