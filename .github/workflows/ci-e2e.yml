@@ -57,7 +57,7 @@ jobs:
       # por lock de assets que ci-movil.yml. `preparar` debajo verifica los
       # SHA-256 y descarga lo que falte (con cache acertado es casi no-op).
       - name: Cache de assets externos
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             apps/digielect14/public/models/rapidocr/*.onnx
@@ -70,7 +70,7 @@ jobs:
       # Cache del navegador de Playwright (~170 MB): la versión del binario
       # la fija el lockfile (@playwright/test en apps/digielect14).
       - name: Cache de navegadores Playwright
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
