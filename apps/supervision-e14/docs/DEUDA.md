@@ -183,3 +183,19 @@ residuales restantes son excepciones documentadas:
   íntegro del bundle, fsck limpio).
 - Triage: 0 hallazgos → 0 rotaciones. A-05 (reescritura de historia): sin
   secretos en historia; decisión HUMANA igualmente (A-05) por otros motivos.
+
+## 10. Higiene de pruebas
+
+- **Flaky dependiente del orden de suites (cerrado con R-01, registrado por
+  R-23 — auditoría 2026-11-16).** El test M11 de `clonado-profundo.test.ts`
+  solo fallaba si `hub-local-drenaje.test.ts` corría ANTES: bun test comparte
+  el registro de módulos entre archivos y el drenaje SEMBRABA el singleton
+  runtime de actas que el clonado heredaba. Causa raíz cerrada doble: (1) el
+  aliasing en `fusionarActaRuntime` se rompió clonando en la frontera; (2)
+  cada suite ahora siembra SU estado (`vaciarActasRuntimeParaPrueba()` en
+  beforeEach/afterEach). **Regla permanente: ninguna suite depende de singletons
+  sembrados por otra — todo estado compartido se resetea en beforeEach.**
+  Condición de reactivación: si vuelve a aparecer un test que pasa aislado y
+  falla en suite, buscar SIEMPRE estado de módulo compartido antes de tocar el
+  test. (bun test no tiene --randomize todavía; el orden del readdir del clon
+  es el que manda — la regla de beforeEach es la defensa.)

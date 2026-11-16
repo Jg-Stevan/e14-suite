@@ -89,6 +89,8 @@ import type { Acta } from "@/modules/digitalizador/lib/e14/types";
 // PROHIBIDO inventar jerarquía: si la base falla, los selects degradan a
 // display honesto). public/e14/divipol.json — mismo catálogo del
 // clasificador.
+// R-22 (H-19): los componentes NO tocan el motor — fachada del módulo
+// (mismo patrón 7.5/A4 del hermano digitalizador).
 import {
   cargarDivipol,
   mesasDePuesto,
@@ -96,7 +98,7 @@ import {
   puestosDe,
   zonasDe,
   type DivipolBase,
-} from "@jg-stevan/scanner-core/dominio/divipol";
+} from "@/modules/digitalizador/lib/e14/fachada";
 // KIT editor-masiva-v1: horneado de ROTAR por canvas (misma disciplina de
 // siempre — canvas puro, dataURL out). El recorte RECTANGULAR
 // (`recortarDataUrl`) lo sustituye el editor de perspectiva (T4).

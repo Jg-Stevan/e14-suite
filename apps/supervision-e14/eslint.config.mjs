@@ -5,6 +5,22 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  // R-22 (H-19, auditoría 2026-11-16) — guard de capa: los COMPONENTES del
+  // módulo digitalizador no tocan el motor directamente (misma frontera que
+  // digielect14 defiende en error desde 7.5/A4). El consumo pasa por
+  // src/modules/digitalizador/lib/e14/fachada.ts.
+  {
+    files: ["src/modules/digitalizador/components/**"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [{
+          group: ["@jg-stevan/scanner-core", "@jg-stevan/scanner-core/*"],
+          message:
+            "Los componentes no tocan el motor: re-exporta desde src/modules/digitalizador/lib/e14/fachada.ts (R-22, mismo patrón 7.5/A4 del hermano).",
+        }],
+      }],
+    },
+  },
   // KIT carga-masiva-supervision-v1 (D27): el módulo digitalizador
   // trasplantado (src/modules/digitalizador/**) llega con las reglas de su
   // repo origen (digielect14) — se conservan para no reescribir el motor.
