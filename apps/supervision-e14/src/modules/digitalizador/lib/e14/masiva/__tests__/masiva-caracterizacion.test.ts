@@ -24,8 +24,14 @@
  *     el APARCADO en el CALLER (original detrás en FIFO), no aquí.
  *  E. ANCLAS QA — los literales que grepean los harnesses scripts/qa-*.ts
  *     (WATCHDOG_*_MS, RELECTURA_TOPE_MS, mutex, reutilizar*, bloque capa-0,
- *     console.info relectura, iniciar/pausar/rearrancar) SIGUEN en runner.ts
- *     (como literales o como `export const ANCLA_...`).
+ *     console.info relectura, iniciar/pausar/rearrancar) SIGUEN grepeables en
+ *     el runner. R-26 (H-18, auditoría 2026-11-16 · decisión D-2) extrajo las
+ *     TRES fases grandes a masiva/fases/ (fase-capa0-qr · fase-pipeline-
+ *     intentos · fase-desenlace + contexto tipado compartido): las anclas de
+ *     una fase movida se RE-POSICIONARON a su archivo NUEVO (mismo literal,
+ *     nueva ubicación — el COMPORTAMIENTO congelado no cambia); las del
+ *     orquestador (archivoPipeline, vetos del envío, bucle, iniciar/pausar/
+ *     rearrancar) permanecen en runner.ts.
  *
  * El harness (caracterizacion.harness.ts) documenta QUÉ se simula y QUÉ no.
  */
@@ -1006,38 +1012,75 @@ describe("R8 · F — C5: aparcado + re-visita al terminar la ola", () => {
 
 // ═══════════════ E · ANCLAS QA (los greps del post-mortem NO se rompen) ═════
 
-describe("R8 · E — anclas QA: los literales grepeados siguen en runner.ts", () => {
-  const fuente = Bun.file(new URL("../runner.ts", import.meta.url));
+// R-26 (H-18, auditoría 2026-11-16 · decisión D-2 del plan 2026-11): las TRES
+// fases grandes del runner (capa-0 QR · pipeline de intentos · desenlace) se
+// extrajeron a masiva/fases/ junto con el contexto tipado compartido
+// (contexto.ts — tipos Ctx* + trazasPostMortemDe + mutex + reutilizarResultado
+// + motivoCorto + proximaFilaPendiente). Las anclas cuyo literal SE MOVIÓ con
+// su fase se re-posicionaron AL ARCHIVO NUEVO — el COMPORTAMIENTO congelado
+// no cambia, SOLO su ubicación (actualización legítima del snapshot de
+// caracterización). Las anclas del orquestador (archivoPipeline, vetos del
+// envío, bucle del pool, iniciar/pausar/rearrancar) SIGUEN en runner.ts.
+describe("R8 · E — anclas QA: los literales grepeados siguen (runner.ts + fases/* tras R-26)", () => {
+  const fuentes = {
+    runner: "../runner.ts",
+    contexto: "../fases/contexto.ts",
+    capa0: "../fases/fase-capa0-qr.ts",
+    intentos: "../fases/fase-pipeline-intentos.ts",
+    desenlace: "../fases/fase-desenlace.ts",
+  } as const;
   let texto = "";
+  let textoContexto = "";
+  let textoCapa0 = "";
+  let textoIntentos = "";
+  let textoDesenlace = "";
   beforeEach(async () => {
-    texto = await fuente.text();
+    texto = await Bun.file(new URL(fuentes.runner, import.meta.url)).text();
+    textoContexto = await Bun.file(new URL(fuentes.contexto, import.meta.url)).text();
+    textoCapa0 = await Bun.file(new URL(fuentes.capa0, import.meta.url)).text();
+    textoIntentos = await Bun.file(new URL(fuentes.intentos, import.meta.url)).text();
+    textoDesenlace = await Bun.file(new URL(fuentes.desenlace, import.meta.url)).text();
   });
 
-  const anclas = [
-    "const WATCHDOG_MS = 75_000;",
-    "const WATCHDOG_INTENTOS = 2;",
-    "const WATCHDOG_GRACIA_MS = 5_000;",
-    "const RELECTURA_TOPE_MS = 45_000;",
-    "let mutexDedup: Promise<void> = Promise.resolve();",
-    "async function conExclusionMutua<",
-    "return conExclusionMutua(() => reutilizarResultadoCritica(fila, t0))",
-    "const originalEnviada = actaCopia.status ===",
-    "actaCopia.enviadoAutomaticamente = null;",
-    "const archivoPipeline = archivo",
-    "console.info(",
-    "[e14] relectura-interna fila=",
-    "export function iniciarRunner",
-    "export function pausarRunner",
-    "export function rearrancarTrasEncolar",
+  // [archivo, ancla] — RE-POSICIONADAS por R-26 a su fase; el literal viajó
+  // TAL CUAL (mismo nombre, mismo valor, misma firma).
+  const anclas: [clave: keyof typeof fuentes, ancla: string][] = [
+    ["intentos", "const WATCHDOG_MS = 75_000;"],
+    ["intentos", "const WATCHDOG_INTENTOS = 2;"],
+    ["intentos", "const WATCHDOG_GRACIA_MS = 5_000;"],
+    ["desenlace", "const RELECTURA_TOPE_MS = 45_000;"],
+    ["contexto", "let mutexDedup: Promise<void> = Promise.resolve();"],
+    ["contexto", "async function conExclusionMutua<"],
+    ["contexto", "return conExclusionMutua(() => reutilizarResultadoCritica(fila, t0))"],
+    ["contexto", "const originalEnviada = actaCopia.status ==="],
+    ["contexto", "actaCopia.enviadoAutomaticamente = null;"],
+    ["runner", "const archivoPipeline = archivo"],
+    ["desenlace", "console.info("],
+    ["desenlace", "[e14] relectura-interna fila="],
+    ["runner", "export function iniciarRunner"],
+    ["runner", "export function pausarRunner"],
+    ["runner", "export function rearrancarTrasEncolar"],
   ];
 
-  for (const ancla of anclas) {
-    test(`ancla en runner.ts: ${ancla.slice(0, 48)}`, () => {
-      expect(texto.includes(ancla)).toBe(true);
+  const textoDe = (clave: keyof typeof fuentes): string =>
+    clave === "runner"
+      ? texto
+      : clave === "contexto"
+        ? textoContexto
+        : clave === "capa0"
+          ? textoCapa0
+          : clave === "intentos"
+            ? textoIntentos
+            : textoDesenlace;
+
+  for (const [clave, ancla] of anclas) {
+    test(`ancla en ${fuentes[clave]}: ${ancla.slice(0, 48)}`, () => {
+      expect(textoDe(clave).includes(ancla)).toBe(true);
     });
   }
 
-  test("los literales [e14] capa0-qr / dedup / veto siguen grepeables en runner.ts y runner-dedup.ts", async () => {
+  test("los literales [e14] capa0-qr / dedup / veto siguen grepeables en runner.ts, fases/* y runner-dedup.ts", async () => {
+    // Fase 1 (R-26 → fases/fase-capa0-qr.ts) — bloque capa-0 completo:
     for (const literal of [
       "[e14] capa0-qr worker fila=",
       "[e14] capa0-qr reutiliza",
@@ -1049,16 +1092,26 @@ describe("R8 · E — anclas QA: los literales grepeados siguen en runner.ts", (
       "[e14] capa0-qr fallback fila=",
       "[e14] capa0-qr techo-vencido",
       "[e14] capa0-qr reprocesa-completo",
-      "[e14] dedup-identidad fila=",
-      "[e14] veto ya-enviada post-ocr",
-      "[e14] veto ya-enviada REMOTO",
-      "[e14] dedup fila=",
+    ]) {
+      expect(textoCapa0.includes(literal)).toBe(true);
+    }
+    // Fase 2 (R-26 → fases/fase-pipeline-intentos.ts) — intentos/watchdog:
+    for (const literal of [
       "[e14] watchdog fila=",
       "[e14] rescate-rechazo",
       "[e14] decode-maestro fila=",
-      "[e14] precalor fila=",
       "[e14] origen=",
+    ]) {
+      expect(textoIntentos.includes(literal)).toBe(true);
+    }
+    // Fase 3 (R-26 → fases/fase-desenlace.ts) — capa 2 identidad:
+    expect(textoDesenlace.includes("[e14] dedup-identidad fila=")).toBe(true);
+    // Orquestador (PERMANECEN en runner.ts — envío + prólogo del dedup):
+    for (const literal of [
+      "[e14] veto ya-enviada post-ocr",
+      "[e14] veto ya-enviada REMOTO",
       "[e14] dedup fila=",
+      "[e14] precalor fila=",
     ]) {
       expect(texto.includes(literal)).toBe(true);
     }
