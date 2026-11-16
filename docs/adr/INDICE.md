@@ -22,6 +22,7 @@ Estado de cada ADR: **VIGENTE** · **SUPERADA** (por cuál) · **OBSOLETA**.
 | D-sim-color | `sim-color.jpg` reemplazada por demo sintética (mismo nombre de archivo) | VIGENTE | Era byte-idéntica al acta real eliminada por D86 (blob `18fb8543` / md5 `08cd5f9d…`). Ver plan §3.1 y R3. |
 | D-e1-retiro | Telemetría E1 `msCrops` retirada | VIGENTE | Ningún productor la llenaba (siempre 0). Documentada como roadmap post-aprobación. |
 | D-e3-diferido | Atlas de tensores OCR (E3) diferido a post-aprobación | VIGENTE | Flag `ocrTensorAtlas` apagada por defecto; no se arriesga la fecha de presentación. |
+| D-amenaza-firma | **La firma HMAC del puente protege integridad del sobre + origen del dispositivo, NO confidencialidad** — la clave en `localStorage` queda aceptada con la frontera XSS declarada | VIGENTE | Cierra R-40 (hueco compartido §6.5, auditoría 2026-11-16). `docs/adr/2026-11-16-modelo-amenaza-clave-firma.md`: atacantes A1–A3 (red→bloqueado por TLS+HMAC, LAN→bloqueado por firma, XSS en el navegador del operador→residual aceptado por dispositivo/jornada), por qué NO WebCrypto no-extraíble (el XSS firma por proxy) y el cross-ref al anti-replay R-32 / cierre de D-puente. |
 
 ## Decisiones heredadas pendientes de cerrar
 
