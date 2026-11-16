@@ -28,7 +28,7 @@ Estado de cada ADR: **VIGENTE** · **SUPERADA** (por cuál) · **OBSOLETA**.
 | # | Título | Estado | Pendiente |
 |---|---|---|---|
 | D-onnx | Bump onnxruntime-web 1.30.0 → 1.31.1 (dependabot) | ABIERTA | Re-medir OCR en gama baja con el bench existente y registrar, o revertir al pin 1.30.0. Violación conocida de la regla de pines exactos. |
-| D-puente | Fuente del worker `e14-puente` versionada | ABIERTA (D99) | Hoy no está en ningún repo — versionarla en el monorepo o repo de infra. |
+| D-puente | Fuente del worker `e14-puente` versionada | PARCIAL (R-32) | CONTRATO FORMAL publicado (`docs/adr/2026-11-16-contrato-hub-e14-puente.md`: sobre, firma HMAC, anti-replay declarado, lecturas Bearer, lo no-auditable declarado y requisito de SHA de despliegue). La FUENTE sigue fuera — traerla a `packages/e14-puente/` cierra el ciclo. |
 
 ## Huecos conocidos de la historia de decisiones (consolidación)
 
