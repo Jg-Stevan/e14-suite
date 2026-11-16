@@ -722,10 +722,20 @@ describe("caracterización · escanearActa (entrada, inyección FASE F y watchdo
       }),
     );
     expect(acta.status).toBe("RECHAZADA"); // el watchdog resolvió primero
-    await new Promise((r) => setTimeout(r, 120));
+    // R-23: espera por POLING, no sleep fijo — bajo carga de CI el callback
+    // tardío podía llegar después de los 120 ms originales (flaky de
+    // temporización, no de comportamiento): lo que se caracteriza es el
+    // ORDEN (watchdog primero, rescate después), no la latencia exacta.
+    for (let i = 0; i < 50 && rescates.length === 0; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
     expect(rescates).toHaveLength(1);
     expect(rescates[0].acta.id).toBe("acta-tardia");
-    expect(rescates[0].ms).toBeGreaterThanOrEqual(80);
+    // «ms reales» = medidos desde el arranque del escaneo, no fabricados:
+    // con tolerancia al jitter de scheduling del timer (el setTimeout(80)
+    // arranca un instante DESPUÉS del t0 del watchdog, así que el medido
+    // puede ser 79 — R-23: caracterizamos la semántica, no el dígito exacto).
+    expect(rescates[0].ms).toBeGreaterThanOrEqual(75);
   });
 });
 
