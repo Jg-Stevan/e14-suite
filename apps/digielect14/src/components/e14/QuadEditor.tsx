@@ -175,6 +175,9 @@ export function QuadEditor({
         }
       })
       .catch(() => {
+        // Rastro vía 4 del ADR: el fallo de decode se eleva a UI — sin
+        // foto y con falloDecode=true el editor muestra el aviso en vez de
+        // quedarse mudo.
         if (!cancelled) {
           setNatural(null);
           setFalloDecode(true);

@@ -7,10 +7,15 @@
  * rastro el diagnóstico en jornada electoral era imposible.
  *
  * La política (docs/adr/politica-errores-catches.md): todo catch de
- * producción deja rastro por una de 4 vías — comentario del porqué ·
+ * producción deja rastro por una de 5 vías — comentario del porqué ·
  * logger.debug (eliminado del bundle de producción) · logger.warn (viaja al
- * buffer obs) · estado visible en UI. Este guard congela la regla: un catch
- * cuyo cuerpo no tenga NI comentario NI llamada a logger/console lo pone
+ * buffer obs) · estado visible en UI · fire-and-forget declarado (SOLO
+ * handlers de promesa con cuerpo vacío sobre promesas void-eadas). Este
+ * guard congela la regla sobre AMBAS formas — try/catch Y handlers de
+ * promesa `.catch(...)` (la brecha de cobertura sobre .catch se cerró en la
+ * verificación del cierre del plan: 49 handlers sin rastro quedaban fuera
+ * del guard original) — un catch cuyo cuerpo no tenga NI comentario NI
+ * llamada a logger/console (y no sea el idiom vacío de la vía 5) lo pone
  * rojo, salvo que esté en la lista blanca con justificación.
  *
  * Corre en `bun test packages/scanner-core` — que es parte del `verificar`
@@ -83,25 +88,84 @@ function cuerpoCatch(lineas: string[], i: number): string | null {
   return trozos.join("\n");
 }
 
+/** Handler balanceado de un `.catch(` que abre en `lineas[i]` — el texto
+ *  entre el paréntesis de apertura y su `)` de cierre correspondiente
+ *  (contando SOLO profundidad de paréntesis; llaves/corchetes internos no
+ *  afectan). null si el handler no cierra en el archivo. */
+function cuerpoCatchPromesa(lineas: string[], i: number, trasApertura: string): string | null {
+  const trozos: string[] = [];
+  let profundidad = 1; // el "(" de .catch(
+  let restante = trasApertura;
+  while (true) {
+    for (let k = 0; k < restante.length; k++) {
+      const c = restante[k];
+      if (c === "(") profundidad += 1;
+      else if (c === ")") {
+        profundidad -= 1;
+        if (profundidad === 0) {
+          trozos.push(restante.slice(0, k));
+          return trozos.join("\n");
+        }
+      }
+    }
+    trozos.push(restante);
+    if (i + 1 >= lineas.length || trozos.length > 40) return null;
+    i += 1;
+    restante = lineas[i];
+  }
+}
+
 interface CatchDesnudo {
   archivo: string;
   linea: number;
 }
 
-/** Todo catch de producción sin comentario NI log en el cuerpo. */
+/** ¿El handler de la promesa es el idiom fire-and-forget de la vía 5 del
+ *  ADR (cuerpo vacío: `() => {}`, `() => undefined`, `() => null`)? */
+function esFireAndForgetVacio(handler: string): boolean {
+  return /^\s*(?:async\s+)?(?:\([^()]*\)|[A-Za-z_$][\w$]*)?\s*=>\s*\{\s*\}\s*$/.test(handler) ||
+    /^\s*(?:async\s+)?(?:\([^()]*\)|[A-Za-z_$][\w$]*)?\s*=>\s*(?:undefined|null)\s*$/.test(handler);
+}
+
+/** ¿El handler es UNA expresión sin bloque (referencia a función o flecha
+ *  de expresión)? Es comportamiento visible (vía 3/4 del ADR). */
+function esExpresionSuelta(handler: string): boolean {
+  const sinBloque = /^\s*(?:async\s+)?(?:\([^()]*\)|[A-Za-z_$][\w$]*)?\s*=>\s*(?!\{)\S/.test(handler);
+  const referencia = /^\s*(?:async\s+)?[A-Za-z_$][\w$]*\s*$/.test(handler);
+  return sinBloque || referencia;
+}
+
+/** Todo catch de producción sin comentario NI log en el cuerpo — try/catch
+ *  Y handlers de promesa `.catch(...)`. */
 function catchesDesnudos(): CatchDesnudo[] {
   const desnudos: CatchDesnudo[] = [];
+  const registrar = (ruta: string, linea: number): void => {
+    desnudos.push({ archivo: ruta.replace(RAIZ_REPO + "/", ""), linea });
+  };
   for (const arbol of ARBOLES) {
     for (const ruta of archivosFuente(arbol)) {
       const lineas = readFileSync(ruta, "utf8").split("\n");
       for (let i = 0; i < lineas.length; i++) {
-        if (!/\bcatch\s*(\{|\()/.test(lineas[i])) continue;
-        const cuerpo = cuerpoCatch(lineas, i);
-        if (cuerpo === null) continue;
-        const tieneLog = /\b(?:logger|console)\.\w+\s*\(/.test(cuerpo);
-        const tieneComentario = cuerpo.includes("//") || cuerpo.includes("/*");
-        if (!tieneLog && !tieneComentario) {
-          desnudos.push({ archivo: ruta.replace(RAIZ_REPO + "/", ""), linea: i + 1 });
+        // 1) try/catch clásico (un catch de bloque SIEMPRE deja rastro).
+        if (/\bcatch\s*(\{|\()/.test(lineas[i])) {
+          const cuerpo = cuerpoCatch(lineas, i);
+          if (cuerpo !== null) {
+            const tieneLog = /\b(?:logger|console)\.\w+\s*\(/.test(cuerpo);
+            const tieneComentario = cuerpo.includes("//") || cuerpo.includes("/*");
+            if (!tieneLog && !tieneComentario) registrar(ruta, i + 1);
+            continue;
+          }
+        }
+        // 2) handler de promesa `.catch(...)`.
+        const promesa = /\.catch\s*\(/.exec(lineas[i]);
+        if (promesa) {
+          const handler = cuerpoCatchPromesa(lineas, i, lineas[i].slice(promesa.index + promesa[0].length));
+          if (handler === null) continue;
+          if (esFireAndForgetVacio(handler)) continue; // vía 5 del ADR
+          if (esExpresionSuelta(handler)) continue; // vía 3/4: comportamiento visible
+          const tieneLog = /\b(?:logger|console)\.\w+\s*\(/.test(handler);
+          const tieneComentario = handler.includes("//") || handler.includes("/*");
+          if (!tieneLog && !tieneComentario) registrar(ruta, i + 1);
         }
       }
     }
@@ -119,7 +183,7 @@ describe("guard de catches con rastro (R-20 · política docs/adr/politica-error
     ).toEqual([]);
   });
 
-  test("la lista blanca no admitting entradas muertas (toda excepción sigue vigente)", () => {
+  test("la lista blanca no admite entradas muertas (toda excepción sigue vigente)", () => {
     const desnudos = catchesDesnudos();
     for (const clave of LISTA_BLANCA.keys()) {
       const [archivo, lineaStr] = clave.split(":");

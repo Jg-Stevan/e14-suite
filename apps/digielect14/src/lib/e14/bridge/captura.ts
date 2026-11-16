@@ -37,6 +37,9 @@ export function decodeArchivoMemo(file: File): Promise<string> {
     p = fileToCaptureDataUrl(file, opcionesRescateHeic());
     decodeMemo.set(file, p);
     void p.catch(() => {
+      // Rastro vía 1 del ADR (cosmético interno): el fallo del decode ya
+      // se propaga al llamador por la promesa devuelta; esto solo limpia
+      // la memo para no cachear el rechazo — reintentar re-decodea.
       if (decodeMemo.get(file) === p) decodeMemo.delete(file);
     });
   }

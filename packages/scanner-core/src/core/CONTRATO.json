@@ -18,7 +18,7 @@
     "detector-client.ts": "4ab6106e15c8433d905facd21c154f3b",
     "image-modes.ts": "0b8881cb025bd5adbde1a7421f5c1954",
     "image-processor.ts": "44ebd70b469ae5f369e00d387c02ad40",
-    "ocr.ts": "bc61e395779043e81cf8d89cff0891f2",
+    "ocr.ts": "deb8e20e745d99c2652582572f927dda",
     "types.ts": "54943986fffac5e0b58dc586ebf89a9d"
   }
 }

@@ -354,6 +354,9 @@ export function instalarPersister(store: E14StoreApi): void {
             emitirJornadaCambiada();
           })
           .catch((err: unknown) => {
+            // Rastro vía 3/4 del ADR: manejarErrorEscrituraIdb clasifica el
+            // fallo (cuota/IDB) y lo eleva a aviso visible en UI — jamás se
+            // calla una pérdida de persistencia.
             manejarErrorEscrituraIdb(store.getState, err);
           });
       }
@@ -371,6 +374,9 @@ export function instalarPersister(store: E14StoreApi): void {
           return vigilarCuotaTrasEscrituraGrande(store.getState);
         })
         .catch((err: unknown) => {
+          // Rastro vía 3/4 del ADR: manejarErrorEscrituraIdb clasifica y
+          // eleva a aviso visible — la escritura grande del slot (fotos
+          // como Blobs) es la candidata natural a reventar cuota.
           manejarErrorEscrituraIdb(store.getState, err);
         });
     }

@@ -161,6 +161,8 @@ export function useSelectorFuente({
     // despacharArchivo termina llamando dispararEscaneo (el store apaga la
     // bandera al arrancar); si el flujo se cae, la bandera se limpia acá.
     void despacharArchivo(archivo, true).catch(() => {
+      // Rastro vía 4 del ADR: el fallo deja estado visible (bandera fuera
+      // en UI) — el usuario ve que la importación no arrancó y reintenta.
       useE14Store.getState().setImportPendiente(false);
     });
   };

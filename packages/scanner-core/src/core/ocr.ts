@@ -152,10 +152,14 @@ function getOcrWorker(): Promise<TesseractWorker> {
         }
       },
     });
-  })().catch((err) => {
-    ocrWorkerPromise = null;
-    throw err;
-  });
+  })()
+    .catch((err) => {
+      // Rastro vía 1 del ADR: este handler NO traga — resetea la memo del
+      // worker (el siguiente uso re-inicializa desde cero) y re-lanza el
+      // error al llamador real del pipeline OCR.
+      ocrWorkerPromise = null;
+      throw err;
+    });
   return ocrWorkerPromise;
 }
 
