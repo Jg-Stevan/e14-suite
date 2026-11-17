@@ -108,7 +108,7 @@ export function ZonaCarga({
     <p className="mt-1 font-mono text-[11px] font-bold uppercase tracking-widest text-gray-300">
       SUELTA ARCHIVOS EN CUALQUIER PARTE DE ESTA PANTALLA
     </p>
-    <span className="font-mono text-[10px] uppercase tracking-wider text-gray-500">
+    <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
       SOPORTA MÚLTIPLES FOTOS, PDF, ZIP O RAR
     </span>
   </div>

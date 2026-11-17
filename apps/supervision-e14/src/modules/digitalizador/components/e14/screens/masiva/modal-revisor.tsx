@@ -1554,7 +1554,7 @@ function ModalRevisorBase({
                   </span>
                 ) : (
                   /* Sin código en el manifiesto → «—» honesto (V2-01). */
-                  <span className="text-sm font-bold tracking-widest text-gray-500">
+                  <span className="text-sm font-bold tracking-widest text-muted-foreground">
                     —
                   </span>
                 )}
@@ -1817,7 +1817,7 @@ function ModalRevisorBase({
           {/* ── Nota de auditoría ── */}
           <div className="flex items-start gap-2 border-t border-[var(--mz-border)]/40 pt-2">
             <Info className="mt-px h-3.5 w-3.5 shrink-0 text-gray-400" />
-            <span className="font-mono text-[10px] uppercase tracking-wider text-gray-500">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
               ESTA ACCIÓN QUEDARÁ REGISTRADA EN LA AUDITORÍA.
             </span>
           </div>

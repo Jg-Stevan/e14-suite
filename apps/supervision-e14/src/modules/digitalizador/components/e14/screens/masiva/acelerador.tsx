@@ -272,7 +272,7 @@ export function AceleradorNativo() {
                   ? "text-red-300"
                   : consulta || permisoPendiente
                     ? "text-amber-300"
-                    : "text-gray-500"
+                    : "text-muted-foreground"
             }
           >
             {activo
@@ -299,7 +299,7 @@ export function AceleradorNativo() {
             <Linea k="SONDEO" v={`${salud.ms} ms`} />
           </>
         ) : consulta ? (
-          <p className="text-gray-500">COMPROBANDO PERMISO DE RED LOCAL…</p>
+          <p className="text-muted-foreground">COMPROBANDO PERMISO DE RED LOCAL…</p>
         ) : permisoPendiente ? (
           <>
             <p className="font-bold text-amber-300">CHROME PIDE PERMISO DE RED LOCAL</p>
@@ -394,7 +394,7 @@ export function AceleradorNativo() {
                   ? `REINTENTAR (${reintentos})`
                   : "YA LO PUSE — REINTENTAR"}
           </button>
-          <p className="text-[9px] leading-tight text-gray-500">
+          <p className="text-[9px] leading-tight text-muted-foreground">
             Descomprime la carpeta y ejecuta{" "}
             <span className="text-gray-400">supervision-e14-sidecar.exe</span>.
             Deja la ventana abierta: tarda 5-15 s en decir LISTO. SmartScreen lo

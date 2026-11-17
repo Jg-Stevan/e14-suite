@@ -418,7 +418,7 @@ export default memo(function InformeCorrida() {
             ? `EN CURSO · ${fmtMs(wallCorrida)}`
             : `COMPLETADA${seleccionadaInfo?.motivoCierre ? ` · cierre: ${seleccionadaInfo.motivoCierre}` : ""} · ${fmtMs(wallCorrida)}`}
         </span>
-        <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500">
+        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
           {seleccionadaInfo ? fmtFechaRelativa(seleccionadaInfo.inicio) : ""}
         </span>
 
@@ -447,7 +447,7 @@ export default memo(function InformeCorrida() {
             className={`min-h-[44px] px-3 rounded-xl border font-mono text-[10px] font-bold uppercase tracking-wider transition cursor-pointer ${
               escobaArmada
                 ? "border-red-500 text-red-400 bg-red-500/20 animate-pulse"
-                : "border-slate-800 bg-[#10161f] text-slate-500 hover:border-slate-600 hover:text-white"
+                : "border-slate-800 bg-[#10161f] text-muted-foreground hover:border-slate-600 hover:text-white"
             }`}
           >
             {escobaArmada ? "¿SEGURO?" : "LIMPIAR"}
@@ -473,7 +473,7 @@ export default memo(function InformeCorrida() {
 
           {/* ——— etapas (barras del presupuesto del pipeline) ——— */}
           <div className="flex flex-col gap-1.5">
-            <p className="font-mono text-[10px] uppercase tracking-wider text-slate-500">
+            <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
               ¿EN QUÉ SE VA EL TIEMPO? — sumas de la corrida (trabajo {fmtMs(agg.trabajoTotal)} — incluye PRE-OCR del runner, que NO está dentro de totalMs)
             </p>
             {ETAPAS_TRABAJO.filter(({ key }) => (agg.sumas.get(key) ?? 0) > 0).map(({ key, label }) => {
@@ -504,7 +504,7 @@ export default memo(function InformeCorrida() {
                         const sPct = preOcrSuma > 0 ? Math.round((sMs / preOcrSuma) * 100) : 0;
                         return (
                           <div key={sk} className="flex items-center gap-2 pl-5" role="row">
-                            <span className="w-24 shrink-0 font-mono text-[9px] uppercase tracking-wider text-slate-500">
+                            <span className="w-24 shrink-0 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
                               └ {slabel}
                             </span>
                             <div className="flex-1 h-2.5 rounded-md bg-[#10161f] overflow-hidden" role="presentation">
@@ -514,7 +514,7 @@ export default memo(function InformeCorrida() {
                                 aria-hidden
                               />
                             </div>
-                            <span className="w-40 shrink-0 text-right font-mono text-[9px] text-slate-500" role="cell">
+                            <span className="w-40 shrink-0 text-right font-mono text-[9px] text-muted-foreground" role="cell">
                               {fmtMs(sMs)} · {sPct}% del PRE-OCR
                             </span>
                           </div>
@@ -530,7 +530,7 @@ export default memo(function InformeCorrida() {
                         const sPct = ms > 0 ? Math.round((sMs / ms) * 100) : 0;
                         return (
                           <div key={sk} className="flex items-center gap-2 pl-5" role="row">
-                            <span className="w-24 shrink-0 font-mono text-[9px] uppercase tracking-wider text-slate-500">
+                            <span className="w-24 shrink-0 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
                               └ {slabel}
                             </span>
                             <div className="flex-1 h-2.5 rounded-md bg-[#10161f] overflow-hidden" role="presentation">
@@ -540,7 +540,7 @@ export default memo(function InformeCorrida() {
                                 aria-hidden
                               />
                             </div>
-                            <span className="w-40 shrink-0 text-right font-mono text-[9px] text-slate-500" role="cell">
+                            <span className="w-40 shrink-0 text-right font-mono text-[9px] text-muted-foreground" role="cell">
                               {fmtMs(sMs)} · {sPct}% del WARP+REALCE
                             </span>
                           </div>
@@ -551,40 +551,40 @@ export default memo(function InformeCorrida() {
               );
             })}
             {agg.sondeoN > 0 && (
-              <p className="font-mono text-[10px] text-slate-500 mt-0.5">
+              <p className="font-mono text-[10px] text-muted-foreground mt-0.5">
                 + SONDEO QR (ingesta, paralelo al pipeline): {fmtMs(agg.sondeoSum)} en {agg.sondeoN} acta(s)
               </p>
             )}
             {agg.esperaN > 0 && (
-              <p className="font-mono text-[10px] text-slate-500">
+              <p className="font-mono text-[10px] text-muted-foreground">
                 + ESPERA EN COLA: {fmtMs(agg.esperaSum)} en {agg.esperaN} acta(s) (no es trabajo — es turno)
               </p>
             )}
             {agg.ocrEsperaN > 0 && (
-              <p className="font-mono text-[10px] text-slate-500">
+              <p className="font-mono text-[10px] text-muted-foreground">
                 + ESPERA DEL TURNO OCR: {fmtMs(agg.ocrEsperaSum)} en {agg.ocrEsperaN} acta(s) — ya
                 está DENTRO de OCR/ORIENTACIÓN (partición, no trabajo extra)
               </p>
             )}
             {agg.thumbN > 0 && (
-              <p className="font-mono text-[10px] text-slate-500">
+              <p className="font-mono text-[10px] text-muted-foreground">
                 + THUMBS DE BANDEJA (post-pipeline): {fmtMs(agg.thumbSum)} en {agg.thumbN} acta(s)
               </p>
             )}
             {/* KIT e14-tiempos-v2 (D44) — trazas de los 4 ROJOS: herencia (①),
                 re-arms (④) y solape real (③ — prueba D31 del pool). */}
             {agg.conPreOcr > 0 && (
-              <p className="font-mono text-[10px] text-slate-500">
+              <p className="font-mono text-[10px] text-muted-foreground">
                 + QR HEREDADO (capa-0 sin ladder — sondeo/prescan): {agg.qrHeredadas} de {agg.conPreOcr} acta(s) · el resto pagó ladder
               </p>
             )}
             {agg.reintentoActas > 0 && (
-              <p className="font-mono text-[10px] text-slate-500">
+              <p className="font-mono text-[10px] text-muted-foreground">
                 + PRE-OCR RE-ARMADO (watchdog/rescate): {agg.reintentoActas} acta(s) — su PRE-OCR es la SUMA de pasadas
               </p>
             )}
             {agg.nConTs > 1 && (
-              <p className="font-mono text-[10px] text-slate-500">
+              <p className="font-mono text-[10px] text-muted-foreground">
                 + SOLAPE REAL (tsInicio→tsFin): máx {agg.maxSimultaneas} acta(s) en vuelo a la vez · {agg.solapadas} compartieron turno
               </p>
             )}
@@ -592,29 +592,29 @@ export default memo(function InformeCorrida() {
                 informe real: GAP sin mantenedor · PUBLICACIÓN (roundtrip real) ·
                 DEDUP sin-match (por qué no matcheó). */}
             {agg.gapN > 0 && (
-              <p className={`font-mono text-[10px] ${agg.gapSobreUmbral > 0 ? "text-amber-400" : "text-slate-500"}`}>
+              <p className={`font-mono text-[10px] ${agg.gapSobreUmbral > 0 ? "text-amber-400" : "text-muted-foreground"}`}>
                 + GAP SIN MANTENEDOR (muro − totalMs − preOcr − thumb − persist − envío): {agg.gapSobreUmbral} de {agg.gapN} acta(s) &gt; 50 ms · peor {fmtMs(agg.gapPeor)}
               </p>
             )}
             {agg.envioRoundN > 0 && (
-              <p className="font-mono text-[10px] text-slate-500">
+              <p className="font-mono text-[10px] text-muted-foreground">
                 + PUBLICACIÓN AL MONITOR (roundtrip real — envioMs de D61 solo media el dispatch): media {fmtMs(Math.round(agg.envioRoundSum / agg.envioRoundN))} en {agg.envioRoundN} acta(s){agg.envioBloqueadas > 0 ? ` · ${agg.envioBloqueadas} BLOQUEADA(S)` : ""}
               </p>
             )}
             {agg.dedupSinMatch > 0 && (
-              <p className="font-mono text-[10px] text-slate-500">
+              <p className="font-mono text-[10px] text-muted-foreground">
                 + DEDUP SIN-MATCH: {agg.dedupSinMatch} acta(s){agg.dedupDetalleN > 0 ? ` · candidatas comparadas ${Math.round(agg.dedupCandidatasSum / agg.dedupDetalleN)}/acta · mejor distancia ${agg.dedupMejorDist ?? "—"} (umbral 6)` : " · sin diagnóstico de comparación (dhash omitido por gama o falló)"}
               </p>
             )}
             {agg.trabajoTotal === 0 && (
-              <p className="font-mono text-[10px] text-slate-500">Sin etapas de trabajo registradas aún.</p>
+              <p className="font-mono text-[10px] text-muted-foreground">Sin etapas de trabajo registradas aún.</p>
             )}
           </div>
 
           {/* ——— actas más lentas ——— */}
           {agg.lentas.length > 0 && (
             <div className="flex flex-col gap-1.5">
-              <p className="font-mono text-[10px] uppercase tracking-wider text-slate-500">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                 ACTAS MÁS LENTAS (top {agg.lentas.length} — las demás van en el export)
               </p>
               <ul className="flex flex-col gap-1 max-h-56 overflow-y-auto pr-1">
@@ -670,7 +670,7 @@ export default memo(function InformeCorrida() {
           {/* ——— historial de corridas ——— */}
           {corridas.length > 1 && (
             <div className="flex flex-col gap-1.5">
-              <p className="font-mono text-[10px] uppercase tracking-wider text-slate-500">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                 HISTORIAL ({corridas.length} corridas — p50 pipeline {fmtMs(agg.p50Total)} · p95 {fmtMs(agg.p95Total)} de la vista actual)
               </p>
               <ul className="flex flex-col gap-1 max-h-40 overflow-y-auto pr-1">
@@ -713,7 +713,7 @@ export default memo(function InformeCorrida() {
 function Kpi({ label, valor, small }: { label: string; valor: string; small?: boolean }) {
   return (
     <div className="rounded-xl border border-slate-800 bg-[#10161f] px-3 py-2">
-      <p className="font-mono text-[9px] uppercase tracking-wider text-slate-500">{label}</p>
+      <p className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className={`font-mono font-bold text-white truncate ${small ? "text-[10px]" : "text-sm"}`} title={valor}>
         {valor}
       </p>

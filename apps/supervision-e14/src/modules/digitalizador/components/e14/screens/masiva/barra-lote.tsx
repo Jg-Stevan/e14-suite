@@ -104,7 +104,7 @@ export const BarraLote = memo(function BarraLote({
               </span>
             )}
           </div>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-semibold tracking-wider text-gray-500">
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground">
             {corriendo ? (
               <span className="flex items-center gap-1.5 font-bold text-[#00e599]">
                 <span
@@ -151,7 +151,7 @@ export const BarraLote = memo(function BarraLote({
         {corrida && (
           <>
             <div className="flex items-center gap-2 rounded border border-[#112b2a] bg-[#071214] px-2.5 py-1.5 text-gray-300">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
                 SESIÓN
               </span>
               <div className="flex items-center gap-1.5 font-bold tracking-wide text-gray-300">
@@ -171,7 +171,7 @@ export const BarraLote = memo(function BarraLote({
             </div>
             {duracionMs != null && (
               <div className="flex items-center gap-2 rounded border border-[#112b2a] bg-[#071214] px-2.5 py-1.5 text-gray-300">
-                <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
                   DURACIÓN
                 </span>
                 <span className="font-bold tracking-wider text-[#00e599]">

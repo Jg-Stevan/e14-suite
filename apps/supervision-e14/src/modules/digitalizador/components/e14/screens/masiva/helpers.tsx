@@ -156,7 +156,7 @@ export function pildoraEstadoActa(acta: Acta): { label: string; clases: string }
 export function filaInfo(etiqueta: string, valor: string): ReactNode {
   return (
     <div className="flex min-w-0 flex-col gap-0.5 rounded-lg border border-slate-800 bg-[#090d12] px-2.5 py-2">
-      <span className="font-mono text-[8px] uppercase tracking-widest text-slate-500">
+      <span className="font-mono text-[8px] uppercase tracking-widest text-muted-foreground">
         {etiqueta}
       </span>
       <span

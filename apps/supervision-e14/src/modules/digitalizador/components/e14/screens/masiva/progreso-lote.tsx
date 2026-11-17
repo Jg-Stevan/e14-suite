@@ -54,7 +54,7 @@ export const ProgresoLote = memo(function ProgresoLote({
         </span>
       )}
     </p>
-    <p className="shrink-0 font-mono text-[11px] font-bold uppercase tracking-wider text-gray-500">
+    <p className="shrink-0 font-mono text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
       {corriendo ? "COLA ACTIVA" : pendientes > 0 ? `${pendientes} EN COLA` : "COLA QUIETA"}
     </p>
   </div>

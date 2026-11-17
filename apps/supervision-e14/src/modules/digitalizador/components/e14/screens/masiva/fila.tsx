@@ -142,7 +142,7 @@ export const FilaMasivaVista = memo(function FilaMasivaVista({
       ) : (
         <div
           aria-hidden
-          className="mt-0.5 flex h-14 w-12 shrink-0 items-center justify-center rounded border border-[#112b2a] bg-[#04090b] text-gray-500"
+          className="mt-0.5 flex h-14 w-12 shrink-0 items-center justify-center rounded border border-[#112b2a] bg-[#04090b] text-muted-foreground"
         >
           <StitchStackIcon className="h-5 w-5" />
         </div>
@@ -227,7 +227,7 @@ export const FilaMasivaVista = memo(function FilaMasivaVista({
           )}
           {f.qrEstado === "sin-payload" && f.estado === "LISTA" && (
             <span
-              className="rounded px-1 py-0.5 text-[9px] font-semibold tracking-wide text-gray-500"
+              className="rounded px-1 py-0.5 text-[9px] font-semibold tracking-wide text-muted-foreground"
               aria-label="QR no decodificado"
             >
               QR ✗
@@ -236,7 +236,7 @@ export const FilaMasivaVista = memo(function FilaMasivaVista({
           {/* KIT e14-masiva-tiempos-v1 (PR-1): la DUPLICADA señala
               a su original — transparencia total del dedup. */}
           {f.estado === "DUPLICADA" && f.dupOf && (
-            <span className="truncate font-mono text-[9px] uppercase tracking-wider text-gray-500">
+            <span className="truncate font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
               ≡ {nombreOriginal ?? "OTRA FILA"}
             </span>
           )}
