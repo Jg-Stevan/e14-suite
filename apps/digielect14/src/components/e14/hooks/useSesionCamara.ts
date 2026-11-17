@@ -19,7 +19,7 @@
  *  · Efectos, EN EL MISMO ORDEN RELATIVO del original: ARRANQUE (lab
  *    L996-1252, con su cierre/cleanup byte a byte) → re-asignar stream →
  *    «playing» → FRAME LOOP REAL (detección en vivo + k-de-n + feed ZSL).
- *  · avisoCamara («denied»/«perdido» — §E) + toastIOSYaRef.
+ *  · avisoCamara («denied»/«perdido» — §E).
  *
  * Todas las dependencias externas son INYECTADAS con la misma identidad que
  * en el original: videoRef/streamRef (ScanView), camEstado/setCamEstado
@@ -580,7 +580,6 @@ export function useSesionCamara({
   // stream nuevo (lab L2760) y si una respuesta futura llega (L1434).
   const puedeTomarFotoRef = useRef(false);
   const takePhotoBrokenRef = useRef(false);
-  const toastIOSYaRef = useRef(false);
   const telemetriaAtRef = useRef(0);
   const loopRef = useRef<CameraFrameLoop | null>(null);
 
@@ -1074,14 +1073,6 @@ export function useSesionCamara({
       // (lab L2760 — la lista negra temporal se limpia).
       puedeTomarFotoRef.current = CAN_TAKEPHOTO;
       takePhotoBrokenRef.current = false;
-      if (!puedeTomarFotoRef.current && esIOS() && !toastIOSYaRef.current) {
-        toastIOSYaRef.current = true;
-        mostrarAviso(
-          "CÁMARA NATIVA EN IPHONE — el disparo abre la cámara del sistema: la foto sale a resolución completa del sensor.",
-          "warn",
-          6000,
-        );
-      }
       // B3 (lab): si el track muere (permiso revocado, otra app roba la
       // cámara) → overlay §E «SE PERDIÓ LA CÁMARA» sin cambio de modo (el
       // visor no queda congelado; el reintento revive el stream).
