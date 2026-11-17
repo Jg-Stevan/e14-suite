@@ -19,7 +19,15 @@ import { PUBLIC_BASE } from "@/shared/env";
 /** Registra el Service Worker (producción: https/distinto de localhost). */
 export function registerServiceWorker(): void {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
-  if (window.location.protocol !== "https:") return; // el deploy (Cloudflare Pages) es https; localhost dev se salta
+  // KIT e14-motor-offline-v1: localhost puede registrar el SW SOLO con opt-in
+  // explícito (?sw=1 o localStorage e14.sw.local=1) para verificar el camino
+  // real de producción (SW + precarga) sin ensuciar el dev por defecto.
+  const esLocal = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+  const optInLocal =
+    esLocal &&
+    (new URLSearchParams(window.location.search).has("sw") ||
+      window.localStorage.getItem("e14.sw.local") === "1");
+  if (window.location.protocol !== "https:" && !optInLocal) return; // el deploy (Cloudflare Pages) es https; localhost dev se salta
   const register = () => {
     navigator.serviceWorker.register(`${PUBLIC_BASE}/sw.js`).catch(() => {
       /* sin SW la app funciona igual (solo pierde el offline) */

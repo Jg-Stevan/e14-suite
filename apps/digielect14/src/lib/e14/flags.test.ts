@@ -137,6 +137,9 @@ describe("flags · leerFlags (cadena de prioridad)", () => {
       // KIT e14-banda-rapida-v1 — pasada de banda con cap 1280 + sin cls +
       // sin rescate de bordes; default ON (kill-switch: false).
       ocrBandaRapida: true,
+      // KIT e14-motor-offline-v1 — descarga explícita del motor OCR para
+      // campo (~49 MB); default ON (kill-switch: false).
+      precargaMotorOffline: true,
     });
   });
 

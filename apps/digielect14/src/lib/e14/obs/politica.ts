@@ -253,6 +253,10 @@ export function leerOverridesFlags(): Partial<FlagsApp> {
     // línea el kill-switch {"ocrBandaRapida": false} sería inalcanzable desde
     // localStorage (prioridad máxima, D6).
     if (typeof o.ocrBandaRapida === "boolean") limpio.ocrBandaRapida = o.ocrBandaRapida;
+    // KIT e14-motor-offline-v1 — mismo criterio (DOBLE whitelist): sin esta
+    // línea el kill-switch {"precargaMotorOffline": false} sería inalcanzable
+    // desde localStorage (prioridad máxima, D6).
+    if (typeof o.precargaMotorOffline === "boolean") limpio.precargaMotorOffline = o.precargaMotorOffline;
     // NOTA (eliminación del módulo masiva): las puertas de los 17 flags
     // exclusivos de la cola se retiraron junto con el módulo.
     return limpio;

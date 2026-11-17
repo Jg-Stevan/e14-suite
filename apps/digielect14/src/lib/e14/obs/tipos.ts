@@ -196,6 +196,12 @@ export interface FlagsApp {
   // bordes (la orientación ya la fijó el warp y el sello es texto grande).
   // false = la pasada de siempre byte a byte.
   ocrBandaRapida: boolean; // default true
+  // ─── KIT e14-motor-offline-v1 — campo ADITIVO AL FINAL (D57) ─────────────
+  // Preparación EXPLÍCITA del motor OCR para campo (banner «Modo campo»):
+  // descarga y verifica OpenCV + RapidOCR + ONNX + Tesseract + workers en un
+  // CacheStorage propio que el SW sirve antes que la red. false = kill-switch
+  // total (banner y precarga apagados; el cache-on-first-use de siempre).
+  precargaMotorOffline: boolean; // default true
 }
 
 export interface ReporteSesion {

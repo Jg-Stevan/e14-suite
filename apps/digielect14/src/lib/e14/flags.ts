@@ -188,6 +188,10 @@ export const FLAGS_DEFAULT: FlagsApp = {
   // score y auto-envío idénticos en las 7 simuladas). false = pasada de
   // siempre byte a byte.
   ocrBandaRapida: true,
+  // KIT e14-motor-offline-v1 — banner «Modo campo» + precarga verificable del
+  // motor OCR (medido en el A13: sin el traineddata/rescate la misma acta cae
+  // de 8.5 a 4.9 offline). true = disponible; false = kill-switch total.
+  precargaMotorOffline: true,
 };
 
 /** Último flags.json bueno (null = nunca llegó). */
@@ -314,6 +318,8 @@ export function sanearFlags(o: unknown): Partial<FlagsApp> {
   if (typeof p.escaneoIdentidad === "boolean") limpio.escaneoIdentidad = p.escaneoIdentidad;
   // KIT e14-banda-rapida-v1 — whitelist aditiva (booleano).
   if (typeof p.ocrBandaRapida === "boolean") limpio.ocrBandaRapida = p.ocrBandaRapida;
+  // KIT e14-motor-offline-v1 — whitelist aditiva (booleano).
+  if (typeof p.precargaMotorOffline === "boolean") limpio.precargaMotorOffline = p.precargaMotorOffline;
   return limpio;
 }
 

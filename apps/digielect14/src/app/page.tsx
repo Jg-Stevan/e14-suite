@@ -58,6 +58,7 @@ const ResumenView = dynamic(
 // lista» — montaje único, no renderiza nada. La instalación la ofrece el
 // banner OFICIAL de Chrome (sin píldora propia).
 import { PwaRegister } from "@/components/e14/PwaRegister";
+import { PreparacionOffline } from "@/components/e14/PreparacionOffline";
 // Task 4: guía de uso (onboarding 1.ª visita + «?»/«h» + SideNav).
 import { AyudaOverlay, abrirAyuda } from "@/components/e14/AyudaOverlay";
 // KIT e14-observabilidad-v1 (A1-C7): bootstrap del rastreo — captura de
@@ -229,6 +230,9 @@ export default function Page() {
         {/* F-PWA (H6): SW offline + instalación — SIEMPRE montado (todas las
           vistas) porque el registro vive en el shell, no en una pantalla. */}
         <PwaRegister />
+        {/* KIT e14-motor-offline-v1: preparación explícita del motor OCR
+            (banner «Modo campo»), montada en el shell como el SW. */}
+        <PreparacionOffline />
         {/* Task 4: guía de uso — montada única, se abre en 1.ª visita. */}
         <AyudaOverlay />
       </div>

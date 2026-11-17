@@ -49,6 +49,9 @@ const CORE_CACHE = `${VERSION}-core`;
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const MOTOR_CACHE = `${VERSION}-motor`;
+// KIT e14-motor-offline-v1 — paquete que prepara la app («Modo campo»). Nombre
+// fijo a propósito: activate NO lo borra y el fetch lo consulta ANTES de red.
+const MOTOR_OFFLINE_CACHE = "e14-motor-offline-v1";
 // A6 (lab): tope de entradas del caché runtime — antes crecía sin límite.
 const RUNTIME_CACHE_MAX = 80;
 
@@ -69,6 +72,12 @@ self.addEventListener("install", (event) => {
           "./vendor/opencv-4.5.5.js",
           "./vendor/opencv-4.12.0-core.js",
           "./scanner/detection-worker.js",
+          // Workers que el pipeline instancia con new Worker(): sin ellos el
+          // primer escaneo offline degrada (medido en el A13).
+          "./scanner/db-postprocess.worker.js",
+          "./scanner/capa0-qr.worker.js",
+          "./scanner/fallback-canvas.worker.js",
+          "./scanner/heartbeat.worker.js",
         ]);
       } catch {
         /* el precache es best-effort: la app funciona sin él */
@@ -89,7 +98,7 @@ self.addEventListener("activate", (event) => {
       const names = await caches.keys();
       await Promise.all(
         names
-          .filter((n) => !n.startsWith(VERSION))
+          .filter((n) => !n.startsWith(VERSION) && !n.startsWith("e14-motor-offline-"))
           .map((n) => caches.delete(n))
       );
       await self.clients.claim();
@@ -125,7 +134,11 @@ function isMotorAsset(url) {
     url.pathname.includes("/models/rapidocr/") ||
     url.pathname.includes("/vendor/onnxruntime/") ||
     url.pathname.includes("/models/tess/") ||
-    url.pathname.includes("/vendor/tesseract/")
+    url.pathname.includes("/vendor/tesseract/") ||
+    // KIT e14-motor-offline-v1: OpenCV del detector y workers del pipeline
+    // entran al mismo camino cache-first (antes solo se cacheaban al vuelo).
+    url.pathname.includes("/vendor/opencv") ||
+    url.pathname.includes("/scanner/")
   );
 }
 
@@ -141,6 +154,12 @@ self.addEventListener("fetch", (event) => {
   if (isMotorAsset(url)) {
     event.respondWith(
       (async () => {
+        // KIT e14-motor-offline-v1: lo que el operador preparó manda (y sirve
+        // sin red desde la primera apertura). ignoreSearch tolera el ?v= de
+        // los workers versionados.
+        const offline = await caches.open(MOTOR_OFFLINE_CACHE);
+        const preparado = await offline.match(req, { ignoreSearch: true });
+        if (preparado) return preparado;
         const cache = await caches.open(MOTOR_CACHE);
         const cached = await cache.match(req);
         if (cached) return cached;
