@@ -1,0 +1,38 @@
+# .gitleaks.toml — R-60 (2026-11-19).
+#
+# Configuración de gitleaks para el monorepo e14-suite. El workflow
+# ci-seguridad.yml usa gitleaks-action v2, que lee ESTE archivo de la raíz
+# automáticamente (el workflow NO se toca en R-60 — el archivo basta).
+#
+# Fecha: 2026-11-19 · Motivo: R-60 del plan de remediación.
+# HISTORIAL PENDIENTE (R-49): el escaneo histórico COMPLETO del tramo
+# pre-2026-11-04 queda PENDIENTE desde el clon íntegro del mantenedor — el
+# escaneo del 2026-11-12 (apps/supervision-e14/docs/archivo/
+# gitleaks-2026-11-12.txt, fallback manual C-4.4) cubrió solo la historia
+# accesible de ESTE clon (recortada: ancestro a3a3d960… ausente) con
+# CERO hallazgos.
+
+[extend]
+# Reglas default de gitleaks como línea base (gh_pat, aws_akia, slack,
+# private-key, generic-api-key…). Cualquier allowlist que se añada aquí abajo
+# DEBE llevar comentario con el falso positivo concreto que justifica.
+useDefault = true
+
+# ── Allowlists: CONSERVADORAS (regla del repo: si dudas, NO allowlistees) ──
+#
+# Verificación hecha el 2026-11-19 (rg "AKIA|ghp_|sk-|xoxb|BEGIN (RSA|EC)
+# PRIVATE|AIza" sobre apps/packages/docs/scripts/.github, excluyendo vendor/ y
+# modelos): los ÚNICOS matches son MENCIONES DOCUMENTALES de patrones (sin
+# cuerpo de token) en docs/DEUDA.md de ambas apps («tokens ghp_/vcp_ pegados»,
+# «sk-, AWS AKIA» — relato del incidente, no secretos). Las reglas default
+# exigen el token COMPLETO (ghp_[0-9a-zA-Z]{36}, etc.), así que NO llegan a
+# dispararse: no hay falso positivo evidenciado y NO se allowlistea nada.
+#
+# Rutas evaluadas y DESCARTADAS a propósito (podrían ocultar PII real):
+#   · apps/supervision-e14/docs/archivo/historico/ (manifest original de actas
+#     REALES — nombre sugiere PII: jamás en allowlist).
+#   · **/actas-demo/** y **/actas-reales/** (el lote real salió del HEAD con
+#     D87; no re-introducir una excepción que los taparía si volvieran).
+# Si gitleaks llegara a marcar una mención documental real, allowlistear la
+# regla CONCRETA (path + regex) con fecha y motivo en el comentario — nunca
+# una allowlist de ruta entera sin justificación.
