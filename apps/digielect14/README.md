@@ -51,15 +51,15 @@ descargado con URL y SHA-256 fijados en `scripts/assets.lock.json`).
 bun install
 bun run dev            # http://localhost:3000 (modo simple, un hilo de OCR)
 bun run verificar      # preparar + typecheck + lint + test — la puerta de salida
-bun scripts/qa-paridad-motor.ts   # paridad del motor con supervision-e14 (T-16)
 ```
 
 `bun run verificar` es obligatorio antes de dar por terminado cualquier cambio.
 Un clon limpio necesita `bun run preparar` antes de correr la suite a mano
 (`bun run dev` y `bun run build` ya lo encadenan).
-La paridad repo↔repo (`qa-paridad-motor.ts`, T-16) es SIMÉTRICA: el script
-idéntico vive en los dos repos y corre desde cualquiera de los dos checkouts
-lado a lado (`E14_HERMANO` señala el hermano; sin hermano en disco, «omitido»).
+La paridad repo↔repo ya no depende de un script espejo: el motor vive UNA vez
+en `packages/scanner-core` y ambas apps lo consumen por `workspace:*`; la
+paridad de calidad la sostiene el script de paridad de calidad
+(scripts/qa-paridad-calidad.mjs).
 Para medir OCR/QR con multihilo real (`crossOriginIsolated`), `next dev` no
 sirve: construye y sirve con el servidor COOP/COEP.
 
@@ -91,7 +91,7 @@ canal en el repo. Instrucciones: [docs/DEPLOY.md](docs/DEPLOY.md).
 |---|---|
 | [AGENTS.md](AGENTS.md) | reglas para agentes IA y personas que editan el repo |
 | [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) | mapa del pipeline y de los módulos |
-| [docs/DECISIONS.md](docs/DECISIONS.md) | catálogo de decisiones D1…D7x (la autoridad) |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | catálogo de decisiones D1…D100 (la autoridad) |
 | [docs/DEUDA.md](docs/DEUDA.md) | lo que falta, lo bloqueado y lo que NO se debe tocar |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | trabajo pendiente, ordenado |
 | [docs/archivo/REPORTE-*.md](docs/archivo/) | evidencia de mediciones de cada kit |

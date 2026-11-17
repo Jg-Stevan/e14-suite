@@ -4,7 +4,9 @@ Bienvenido. Este documento te tiene programando en menos de 15 minutos.
 
 ## Requisitos
 
-- [bun](https://bun.sh) >= 1.1 (runtime, gestor de dependencias y runner de tests del panel)
+- **bun >= 1.4.2** — [bun](https://bun.sh) (runtime, gestor de dependencias y
+  runner de tests del panel); fijado por `engines.bun`/`packageManager` del
+  `package.json` raíz.
 - Node >= 20 (para tooling de Next cuando aplique)
 
 ## Primer run

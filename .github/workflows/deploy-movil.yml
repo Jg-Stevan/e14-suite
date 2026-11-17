@@ -1,6 +1,6 @@
 # Deploy móvil — Cloudflare vía opennextjs-cloudflare (mismo entorno que
 # ci-build.yml valida en cada PR). Requiere secrets:
-#   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID  (ver PENDIENTES-TOKEN.md)
+#   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID  (ver docs/PENDIENTES-TOKEN.md)
 name: deploy — movil (Cloudflare / opennextjs)
 
 on:

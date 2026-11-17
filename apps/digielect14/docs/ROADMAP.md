@@ -1,7 +1,7 @@
 # ROADMAP — digielect14
 
 Trabajo pendiente, ordenado por impacto. La **historia** de lo ya hecho no está
-aquí: vive en `docs/DECISIONS.md` (decisiones `D1…D76`), en los
+aquí: vive en `docs/DECISIONS.md` (decisiones `D1…D100`), en los
 `docs/archivo/REPORTE-*.md` (evidencia de cada medición) y en `git log`.
 
 ## 1. Paridad de resultado con `supervision-e14` (prioridad alta)
@@ -95,10 +95,13 @@ supervisor masivo, no que el móvil cargue con la cola masiva.
 
 ## 4. Decisiones del mantenedor que frenan la salida a público
 
-- [ ] **Licencia**: sin `LICENSE`, «público» equivale a todos los derechos
-      reservados.
-- [ ] **`src/assets/acta-e14-real.jpg`** es foto real de un acta y se empaqueta
-      como fixture SIM; se reemplaza por las sintéticas o se justifica.
+- [x] **Licencia** — HECHA: MIT unificada en los 4 `LICENSE` del monorepo
+      (raíz, `apps/digielect14`, `apps/supervision-e14` y
+      `packages/scanner-core`, byte-idénticas — Sprint 1 del plan de
+      remediación, `docs/remediacion/INFORME-REMEDIACION.md` §3).
+- [x] **`src/assets/acta-e14-real.jpg`** — HECHA (D86, 2026-11-08): el acta
+      real salió del repo (HEAD, hermano y purga de historia preparada); el
+      modo SIM carga fixtures sintéticas `acta-sim-*.jpg`.
 - [ ] **Siete ramas remotas ya mergeadas**: borrarlas (acción remota).
 - [ ] **Peso del historial** (`.git` ≈55 MB de blobs ML): solo se reduce
       reescribiendo historia, prohibido por las reglas del repo salvo orden

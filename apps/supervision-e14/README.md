@@ -82,9 +82,8 @@ vas a correr la suite sin arrancar el dev, ejecuta `bun run preparar` antes.
 | `bun run build` | Export estático a `out/` (con `preparar` previo). |
 | `bun run typecheck` | `tsc --noEmit` en modo estricto. |
 | `bun run lint` | ESLint (flat config). |
-| `bun test` | Suite de `bun:test` (38 archivos, 422 pruebas — medido 2026-11-16 tras el plan de remediación; el conteo lo imprime el runner, NO se hardcodea). |
+| `bun test` | Suite de `bun:test` (43 archivos, 482 pruebas — medido 2026-11-19 tras la remediación R-45…R-62: snapshot del panel, decisiones de recepción y contratos nuevos; el conteo lo imprime el runner, NO se hardcodea). |
 | `bun run verificar` | typecheck + lint + test, la misma puerta que CI. |
-| `bun scripts/qa-paridad-motor.ts` | Paridad del motor con el repo gemelo `digielect14` (T-16): corre desde cualquiera de los dos checkouts lado a lado y compara las copias de `packages/scanner-core` byte a byte (script idéntico en ambos repos; `E14_HERMANO` señala el hermano; sin hermano en disco sale «omitido»). Meta: 20/20 — ver [Ola 1 del plan 2026-11-12](https://github.com/Jg-Stevan/supervision-e14). |
 | `bun scripts/hub-local.mjs` | Hub E2E en esta máquina: sirve el móvil y el panel por HTTPS/HTTP y recibe `POST /actas`. Ver [`docs/RUNBOOK-e2e-local-v1.md`](docs/RUNBOOK-e2e-local-v1.md). |
 
 Pruebas opcionales de medición (no son gates): `scripts/bench-navegador.mjs`,
@@ -152,7 +151,7 @@ docs/                Arquitectura, ADR, mediciones, notas OCR/QR y runbooks
 | Documento | Para qué |
 |---|---|
 | [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md) | Módulos, flujo de datos, invariantes y contratos. |
-| [`docs/adr/README.md`](docs/adr/README.md) | Decisiones (D1–D94) con mapa de supersesión. |
+| [`docs/adr/README.md`](docs/adr/README.md) | Decisiones (D1–D99) con mapa de supersesión. |
 | [`docs/MEDICIONES.md`](docs/MEDICIONES.md) | Números reales de rendimiento y calidad. |
 | [`docs/NOTAS-OCR-QR.md`](docs/NOTAS-OCR-QR.md) | Cascada OCR fija (el router murió), modelos y cadena de decodificadores QR. |
 | [`docs/DEUDA.md`](docs/DEUDA.md) | Lo que falta, lo cortado y sus condiciones de retorno. |

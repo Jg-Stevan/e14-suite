@@ -1,8 +1,8 @@
 # Índice de decisiones (ADR) — e14-suite
 
 > Estado: ÍNDICE SEMILLA creado en el commit de docs. La consolidación completa
-> de D1–D99 (desde `DECISIONS.md` de digielect14 y `docs/adr/` de supervision-e14)
-> está EN CURSO — ver Fase E del plan y `PENDIENTES-TOKEN.md`.
+> de D1–D100 (desde `DECISIONS.md` de digielect14 y `docs/adr/` de supervision-e14)
+> está EN CURSO — ver Fase E del plan y `docs/PENDIENTES-TOKEN.md`.
 
 ## Formato
 
@@ -43,5 +43,5 @@ Estado de cada ADR: **VIGENTE** · **SUPERADA** (por cuál) · **OBSOLETA**.
   (suite del panel) exige que toda `D<n>` citada en `src/` de las dos apps y del
   paquete resuelva en alguno de los dos registros del monorepo
   (`docs/adr/README.md` de supervision o `docs/DECISIONS.md` de digielect14).
-- **Tope real**: D98 (dig) / D99 (worker puente). El índice consolidado debe
-  llegar a D1–D99 con estado por decisión.
+- **Tope real**: D100 (dig — R-34, 2026-11-16) / D99-sup (panel). El índice
+  consolidado debe llegar a D1–D100 con estado por decisión.

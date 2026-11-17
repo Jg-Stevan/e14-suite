@@ -62,7 +62,7 @@ bun install                          # desde la raíz (workspaces bun; bun 1.4.2
 
 bun run dev:movil                    # PWA móvil
 bun run dev:panel                    # panel de supervisión
-bun run test:motor                   # suite del motor (207 casos)
+bun run test:motor                   # suite del motor (209 casos)
 bun run verificar:movil              # preparar + typecheck + lint + tests (móvil)
 bun run verificar:panel              # verificar del panel
 ```
@@ -88,8 +88,10 @@ cámara → detección/quad → recortes → OCR (Tesseract/RapidOCR en WASM)
 ## Métricas de la suite
 
 109.706 LOC TypeScript en 408 archivos (sin vendor/assets · medido 2026-11-16) ·
-1.033 pruebas (motor 207 · panel 422 · móvil 404 · medido 2026-11-16 tras el
-plan de remediación) · 949 puestos / 67 países / 3.670 mesas · 0 hallazgos de
+1.187 pruebas (motor 216 · panel 482 · móvil 489 · medido 2026-11-19, tras la
+remediación R-45…R-62 — ver `docs/remediacion/VERIFICACION-FINAL-RE-EJECUTADA.md`
+y el informe de ejecución v3 de la entrega) · 949 puestos / 67 países /
+3.670 mesas · 0 hallazgos de
 escaneo de secretos · CI de mínimo privilegio por app + motor + seguridad
 (gitleaks + bun audit). Cada cifra se regenera con el comando de la sección
 «Cómo correr» — nada de esta portada es irreproducible.
@@ -120,5 +122,7 @@ contra la fuente oficial, ADRs de seguridad).
 ## Documentación
 
 - `CONTRIBUTING.md` — kit de bienvenida para el equipo.
+- `docs/README.md` — índice de docs y ciclo de vida (VIVOS vs CONGELADOS).
+- `docs/PENDIENTES-TOKEN.md` — secretos pendientes de configurar en CI/despliegues.
 - `docs/glosario-e14.md` — acta, DIVIPOLA, idEnlace, puesto, mesa, gate…
-- `docs/adr/INDICE.md` — índice de decisiones (consolidación D1–D99 en curso).
+- `docs/adr/INDICE.md` — índice de decisiones (consolidación D1–D100 en curso).

@@ -1,5 +1,7 @@
 # VERIFICACIÓN FINAL INDEPENDIENTE — re-ejecución completa del plan v2
 
+> **NOTA (2026-11-19):** los artefactos de entrega (`parches/*.patch`, `bundle/`, `COMO-APLICAR.md`) son EXTERNOS a este monorepo: se entregan junto a cada remediación y no se versionan aquí. Vía de aplicación: `git am -3 parches/*.patch` desde un clon limpio. Las menciones a esos artefactos que siguen abajo se conservan como registro histórico.
+
 > **Pregunta que responde:** ¿el plan de remediación se ejecutó correctamente y completo? ¿Está incompleto? ¿Falta algo? ¿Todo funciona?
 > **Método:** tercera pasada, INDEPENDIENTE de los informes anteriores — (1) integridad criptográfica del paquete (árbol git = árbol zip = resultado de `git am`); (2) verificación estructural de las 8 correcciones (D-1…D-6 + 2 añadidos) con evidencia `archivo:línea` sobre el árbol real; (3) verificación DINÁMICA re-ejecutando todo en entorno limpio con bun 1.4.2 instalado a propósito (el sandbox venía con 1.3.14 — exactamente el bug que R-03 remedia).
 > **Base verificada:** `remediacion/plan-2026-11` = `f3d47f9` + 46 commits (`52165b7` · `7314ef4` · `abe5553` · `f21c4ef` · `1b09da7`).

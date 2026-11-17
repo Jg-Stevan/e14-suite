@@ -1,5 +1,7 @@
 # INFORME DE REMEDIACIÓN — e14-suite
 
+> **NOTA (2026-11-19):** los artefactos de entrega (`parches/*.patch`, `bundle/`, `COMO-APLICAR.md`) son EXTERNOS a este monorepo: se entregan junto a cada remediación y no se versionan aquí. Vía de aplicación: `git am -3 parches/*.patch` desde un clon limpio. Las menciones a esos artefactos que siguen abajo se conservan como registro histórico.
+
 > **Nota post-cierre (2026-11-16):** este informe documenta la ejecución original (1.117 pruebas al cerrar el sprint 4). La **verificación independiente del cierre** — que saldó 3 huecos detectados (claim D-1, sabotaje R-39, handlers de promesa del guard) y re-ejecutó todo el apéndice con **1.123/1.123 pruebas** — está en `INFORME-VERIFICACION-CIERRE.md`, junto a este archivo.
 
 > **Ejecución completa del Plan de Remediación v2** (43 tareas + R-44 «micro-limpieza 2» + correcciones D-1…D-6 + gitleaks + SHA de despliegue).
