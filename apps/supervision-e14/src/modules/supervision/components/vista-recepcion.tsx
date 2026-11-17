@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { FileText, Inbox, Pause, Play, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,22 @@ import { HubLocalCard } from "./hub-local-card";
 // Ronda C (R2/R3/R5) — métricas del feed + reloj vivo canónico (1 s).
 import { calcularMetricasFeed, type TonoRitmo } from "../data/feed-metricas";
 import { useRelojSegundos } from "./reloj-vivo";
+// R-55 — decisiones de Recepción (APROBADA/RECHAZADA sobre ADVERTENCIA):
+// registro append-only + TERCERA FUENTE del gate (actas-runtime).
+import {
+  consultarDecisionesRecepcion,
+  registrarDecisionRecepcion,
+  suscribirseDecisionesRecepcion,
+  type DecisionRecepcion,
+  type DecisionRegistrada,
+} from "../data/decisiones-recepcion";
+// R-53 — VENTANA DE FILAS del log (misma doctrina P-25 del monitor): lógica
+// pura testada (ventana-scroll.ts); aquí el wiring de refs.
+import {
+  alturasDeFilas,
+  alturaDeEspaciador,
+  rangoVisible,
+} from "./ventana-scroll";
 import type { FormularioTipo } from "../domain/acta";
 
 /**
@@ -43,10 +59,34 @@ import type { FormularioTipo } from "../domain/acta";
  * (KPIs clickeables, gesto del monitor T3) y por formulario + búsqueda.
  * VER EN MONITOR: seam por props (D27) — filas PUBLICADAS y DUPLICADAS (la
  * duplicada abre la página original que ya está publicada).
+ *
+ * R-53 — el log está VIRTUALIZADO con ventana-scroll (misma doctrina P-25
+ * del monitor: virtualizar sin paginar): la ventana monta SOLO las filas
+ * del scrollport ± margen (±3, corrección sobre precisión) con DOS
+ * espaciadores <li aria-hidden> que mantienen el scrollbar honesto (medidas
+ * reales por ResizeObserver + estimación de 96 px). El snapshot de pausa,
+ * el destello `frescas` y el scrollport max-h-[60vh] quedan intactos.
+ * R-55 — las filas ADVERTENCIA (score 6.5–7.9) ofrecen Aprobar/Rechazar:
+ * la decisión vive en `decisiones-recepcion.ts` (append-only) y alimenta la
+ * tercera fuente del gate del monitor; los Records de EstadoRecepcion NO
+ * cambian (la decisión NO es un desenlace del embudo).
  */
 
 type FiltroEstado = "todas" | EstadoRecepcion;
 type FiltroFormulario = "todos" | FormularioTipo;
+
+// ─── R-53 — constantes de la VENTANA DE FILAS del log ────────────────────
+// Estimación de FilaRecepcion típica (hora dual + miniatura h-13 + py-3 +
+// borde ≈ 95 px): se redondea a 96 y se CORRIGE por fila con medición real
+// (ResizeObserver — mismo gesto de alMedirAbierto de puestos-table).
+const ALTURA_FILA_RECEPCION = 96;
+/** Margen ±3 filas: CORRECCIÓN sobre precisión (decisión R-53). */
+const MARGEN_VENTANA = 3;
+const VENTANA_INICIAL = 24;
+
+/** Snapshot de servidor de las decisiones (useSyncExternalStore — cero
+ *  mismatch SSR; identidad estable entre mutaciones). */
+const DECISIONES_VACIAS: ReadonlyMap<string, DecisionRegistrada> = new Map();
 
 /** Píldora de desenlace (mismos términos del PublicacionChip del masiva). */
 const ESTADO_PILDORA: Record<EstadoRecepcion, string> = {
@@ -150,6 +190,9 @@ function FilaRecepcion({
   entrada,
   nueva,
   onVerEnMonitor,
+  alMedir,
+  decision,
+  onDecidir,
 }: {
   entrada: EntradaRecepcion;
   nueva: boolean;
@@ -162,14 +205,43 @@ function FilaRecepcion({
     tipo?: FormularioTipo,
     pagina?: number
   ) => void;
+  /** R-53 — mide la altura REAL de la fila (ResizeObserver) para que los
+   *  espaciadores de la ventana mantengan el scrollbar honesto. Opcional:
+   *  sin ella, la fila funciona con la estimación de 96 px. */
+  alMedir?: (id: string, px: number) => void;
+  /** R-55 — decisión ya registrada para esta entrada (undefined = pendiente). */
+  decision?: DecisionRegistrada;
+  /** R-55 — registra la decisión (append-only en el módulo; él notifica). */
+  onDecidir?: (idEntrada: string, decision: DecisionRecepcion) => void;
 }) {
   // Una DUPLICADA no crea página nueva, pero SÍ puede abrir la original que
   // ya está en el monitor (trazabilidad sin reproceso).
   const conJoin =
     (entrada.estado === "PUBLICADA" || entrada.estado === "DUPLICADA") &&
     entrada.idEnlace !== "—";
+  // R-55 — SOLO las entradas con statusActa ADVERTENCIA (score 6.5–7.9)
+  // ofrecen la decisión del supervisor (mínimo pactado: minimizar — ni
+  // OPTIMA ni BLOQUEADA ni SIN_JOIN la ofrecen).
+  const conDecision = entrada.statusActa === "ADVERTENCIA";
+  // R-53 — medición REAL de la fila (mismo patrón P-25 de puestos-table:
+  // medida inicial + ResizeObserver, que también cubre el cambio de altura
+  // cuando la píldora de decisión R-55 aparece bajo los botones).
+  const refFila = useRef<HTMLLIElement | null>(null);
+  useEffect(() => {
+    if (!alMedir) return;
+    const el = refFila.current;
+    if (!el) return;
+    const medir = () =>
+      alMedir(entrada.id, Math.round(el.getBoundingClientRect().height));
+    medir();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [alMedir, entrada.id]);
   return (
     <li
+      ref={refFila}
       className={cn(
         "border-b border-border px-4 py-3 last:border-b-0",
         nueva && "fila-llegada"
@@ -297,39 +369,91 @@ function FilaRecepcion({
           </span>
         </span>
 
-        {/* Acción: aterriza el acta en el visor del monitor (seam D27). */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="label-caps h-11 text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground disabled:opacity-40"
-          disabled={!conJoin}
-          title={
-            !conJoin
-              ? "Solo las publicadas aterrizan en el monitor"
-              : entrada.estado === "DUPLICADA"
-                ? "Reenvío idéntico — abre la página que ya está publicada"
-                : "Ver el acta en el monitor"
-          }
-          aria-label={`Ver en monitor: ${entrada.idEnlace} mesa ${entrada.mesa}`}
-          onClick={
-            conJoin && onVerEnMonitor
-              ? () =>
-                  onVerEnMonitor(
-                    entrada.idEnlace,
-                    entrada.mesa,
-                    // C-17 — el formulario del sobre manda; null (SIN_JOIN)
-                    // no llega aquí (botón deshabilitado), pero undefined
-                    // deja que el shell aplique su fallback honesto.
-                    entrada.formulario ?? undefined,
-                    // C-17 — la página observada, no la 1 por defecto.
-                    entrada.paginaIndex ?? undefined
-                  )
-              : undefined
-          }
-        >
-          <FileText className="size-4" aria-hidden />
-          Ver en monitor
-        </Button>
+        {/* Acciones: decisión del supervisor (R-55, SOLO ADVERTENCIA) +
+            aterrizar el acta en el visor del monitor (seam D27). */}
+        <span className="flex w-36 shrink-0 flex-col items-stretch gap-1.5">
+          {conDecision && (
+            <>
+              <span className="flex gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="label-caps h-9 flex-1 border-(--success) px-2 text-(--success) shadow-none disabled:opacity-40"
+                  disabled={decision !== undefined}
+                  aria-label={`Aprobar acta de ${entrada.idEnlace} mesa ${entrada.mesa}`}
+                  title="Aprobación del supervisor — suma la tercera fuente de visibilidad en el monitor (R-55)"
+                  onClick={
+                    onDecidir ? () => onDecidir(entrada.id, "APROBADA") : undefined
+                  }
+                >
+                  Aprobar
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="label-caps h-9 flex-1 border-(--danger) px-2 text-(--danger) shadow-none disabled:opacity-40"
+                  disabled={decision !== undefined}
+                  aria-label={`Rechazar acta de ${entrada.idEnlace} mesa ${entrada.mesa}`}
+                  title="Rechazo del supervisor — no suma visibilidad en el monitor (R-55)"
+                  onClick={
+                    onDecidir ? () => onDecidir(entrada.id, "RECHAZADA") : undefined
+                  }
+                >
+                  Rechazar
+                </Button>
+              </span>
+              {decision && (
+                <span
+                  className={cn(
+                    "label-caps inline-block self-start rounded-[4px] border px-1.5 py-0.5",
+                    decision.decision === "APROBADA"
+                      ? "border-(--success) text-(--success)"
+                      : "border-(--danger) text-(--danger)"
+                  )}
+                  title={
+                    decision.nota
+                      ? `Nota del supervisor: ${decision.nota}`
+                      : "Decisión del supervisor (append-only — no se sobre-decide)"
+                  }
+                >
+                  {decision.decision === "APROBADA" ? "APROBADA" : "RECHAZADA"}
+                </span>
+              )}
+            </>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="label-caps h-11 text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground disabled:opacity-40"
+            disabled={!conJoin}
+            title={
+              !conJoin
+                ? "Solo las publicadas aterrizan en el monitor"
+                : entrada.estado === "DUPLICADA"
+                  ? "Reenvío idéntico — abre la página que ya está publicada"
+                  : "Ver el acta en el monitor"
+            }
+            aria-label={`Ver en monitor: ${entrada.idEnlace} mesa ${entrada.mesa}`}
+            onClick={
+              conJoin && onVerEnMonitor
+                ? () =>
+                    onVerEnMonitor(
+                      entrada.idEnlace,
+                      entrada.mesa,
+                      // C-17 — el formulario del sobre manda; null (SIN_JOIN)
+                      // no llega aquí (botón deshabilitado), pero undefined
+                      // deja que el shell aplique su fallback honesto.
+                      entrada.formulario ?? undefined,
+                      // C-17 — la página observada, no la 1 por defecto.
+                      entrada.paginaIndex ?? undefined
+                    )
+                : undefined
+            }
+          >
+            <FileText className="size-4" aria-hidden />
+            Ver en monitor
+          </Button>
+        </span>
       </div>
     </li>
   );
@@ -610,6 +734,118 @@ export function VistaRecepcion({
     });
   }, [fuente, filtroEstado, filtroFormulario, busqueda]);
 
+  // ─── R-55 — decisiones de Recepción (store externo, patrón reloj-vivo) ──
+  // UN solo suscriptor para toda la vista: el snapshot del módulo es el Map
+  // (identidad nueva por mutación — Object.is de useSyncExternalStore);
+  // cada fila recibe SU decisión por prop. Snapshot de servidor vacío:
+  // cero mismatch SSR.
+  const decisiones = useSyncExternalStore(
+    suscribirseDecisionesRecepcion,
+    () => consultarDecisionesRecepcion(),
+    () => DECISIONES_VACIAS
+  );
+  /** Registra la decisión (append-only en el módulo — él notifica a la
+   *  vista). El resultado rechazado va al log de consola, jamás throw. */
+  const onDecidir = useCallback(
+    (idEntrada: string, decision: DecisionRecepcion) => {
+      const resultado = registrarDecisionRecepcion(idEntrada, decision);
+      if (!resultado.ok) {
+        console.info(
+          `[e14] recepción: decisión no registrada (${resultado.motivo})`
+        );
+      }
+    },
+    []
+  );
+
+  // ─── R-53 — VENTANA DE FILAS del log (patrón P-25 de puestos-table) ─────
+  /** Alturas REALES medidas por fila, POR ID (estables ante el reorden del
+   *  log: las llegadas hacen prepend y desplazan los ÍNDICES, no los ids). */
+  const [alturasPorId, setAlturasPorId] = useState<Map<string, number>>(
+    () => new Map()
+  );
+  const alMedir = useCallback((id: string, px: number) => {
+    setAlturasPorId((prev) => {
+      if (prev.get(id) === px) return prev; // identidad estable si no cambia
+      const siguiente = new Map(prev);
+      siguiente.set(id, px);
+      return siguiente;
+    });
+  }, []);
+  const contenedorRef = useRef<HTMLUListElement | null>(null);
+  const [ventana, setVentana] = useState({ desde: 0, hasta: VENTANA_INICIAL });
+  const rafScrollRef = useRef<number | null>(null);
+
+  /** Alturas por ÍNDICE de la lista visible: medición real donde la haya
+   *  (alturasDeFilas las prefiere sobre la estimación), estimación de 96 px
+   *  del resto. Ambas estimaciones van iguales: aquí TODAS las filas son
+   *  "cerradas" — no hay subdetalles que abran. */
+  const alturas = useMemo(() => {
+    const medidos = new Set<number>();
+    const reales = new Map<number, number>();
+    visibles.forEach((e, i) => {
+      const px = alturasPorId.get(e.id);
+      if (px !== undefined && px > 0) {
+        medidos.add(i);
+        reales.set(i, px);
+      }
+    });
+    return alturasDeFilas(
+      visibles.length,
+      medidos,
+      reales,
+      ALTURA_FILA_RECEPCION,
+      ALTURA_FILA_RECEPCION
+    );
+  }, [visibles, alturasPorId]);
+
+  /** Recalcular la ventana DESDE el scroll actual (montar, alturas nuevas o
+   *  llegada — JAMÁS resetea el scroll del usuario). */
+  const recalcularVentana = useCallback(() => {
+    const el = contenedorRef.current;
+    if (!el) return;
+    const r = rangoVisible(alturas, el.scrollTop, el.clientHeight, MARGEN_VENTANA);
+    setVentana((v) => (v.desde === r.desde && v.hasta === r.hasta ? v : r));
+  }, [alturas]);
+
+  useEffect(() => {
+    // Diferido a rAF (regla lint del repo: nada de setState sincrónico en el
+    // cuerpo del effect — misma regla que puestos-table).
+    const raf = requestAnimationFrame(recalcularVentana);
+    return () => cancelAnimationFrame(raf);
+  }, [recalcularVentana]);
+
+  // Filtro/búsqueda con identidad nueva → contenido distinto bajo el mismo
+  // scroll: volver a 0 UNA vez (NO en cada llegada — el feed vivo jamás
+  // arranca al usuario de donde estaba leyendo; el recálculo por alturas
+  // re-sincroniza la ventana en el scroll actual).
+  useEffect(() => {
+    const el = contenedorRef.current;
+    if (el) el.scrollTo({ top: 0 });
+    const raf = requestAnimationFrame(() =>
+      setVentana({ desde: 0, hasta: VENTANA_INICIAL })
+    );
+    return () => cancelAnimationFrame(raf);
+  }, [filtroEstado, filtroFormulario, busqueda]);
+
+  // Scroll → ventana (rAF-throttled: O(log n) por frame, jamás por tecla).
+  const alScrollVentana = useCallback(() => {
+    if (rafScrollRef.current !== null) return;
+    rafScrollRef.current = requestAnimationFrame(() => {
+      rafScrollRef.current = null;
+      const el = contenedorRef.current;
+      if (!el) return;
+      const r = rangoVisible(alturas, el.scrollTop, el.clientHeight, MARGEN_VENTANA);
+      setVentana((v) => (v.desde === r.desde && v.hasta === r.hasta ? v : r));
+    });
+  }, [alturas]);
+
+  useEffect(() => {
+    return () => {
+      if (rafScrollRef.current !== null) cancelAnimationFrame(rafScrollRef.current);
+    };
+  }, []);
+
   if (entradas === null) {
     return (
       <div className="space-y-3 p-4 md:p-6">
@@ -620,6 +856,15 @@ export function VistaRecepcion({
   }
 
   const ultima = fuente[0];
+
+  // R-53 — espaciadores + filas de la ventana (el scrollbar HONESTO: arriba
+  // + ventana + abajo ≈ la altura total del log filtrado).
+  const { arriba, abajo } = alturaDeEspaciador(
+    alturas,
+    ventana.desde,
+    ventana.hasta
+  );
+  const filasVentana = visibles.slice(ventana.desde, ventana.hasta);
 
   return (
     <div className="space-y-4 p-4 md:p-6">
@@ -917,15 +1162,27 @@ export function VistaRecepcion({
               Acción
             </span>
           </div>
-          <ul className="scroll-panel flex-1 overflow-y-auto">
-            {visibles.map((e) => (
+          <ul
+            ref={contenedorRef}
+            onScroll={alScrollVentana}
+            className="scroll-panel flex-1 overflow-y-auto"
+          >
+            {/* R-53 — espaciadores HONESTOS: mantienen el scrollbar a la
+                altura del log completo (medidas reales + estimación de las
+                no montadas). aria-hidden: el lector jamás los anuncia. */}
+            {arriba > 0 && <li aria-hidden style={{ height: arriba }} />}
+            {filasVentana.map((e) => (
               <FilaRecepcion
                 key={e.id}
                 entrada={e}
                 nueva={frescas.has(e.id)}
                 onVerEnMonitor={onVerEnMonitor}
+                alMedir={alMedir}
+                decision={decisiones.get(e.id)}
+                onDecidir={onDecidir}
               />
             ))}
+            {abajo > 0 && <li aria-hidden style={{ height: abajo }} />}
           </ul>
         </div>
       )}

@@ -28,10 +28,13 @@
  * Una foto DISTINTA para la misma página es un reescaneo legítimo: se
  * publica y la huella se actualiza.
  *
- * MEMORIA DE SESIÓN (§0-5 / D8): sin persistencia y sin backend — el export
- * estático no cambia. Recargar la página restablece el estado (misma
- * disciplina del resto del dashboard); la cola durable del digitalizador
- * vive en IndexedDB de su módulo (masiva/cola).
+ * PERSISTENCIA LOCAL MÍNIMA (R-54 — excepción documentada de D8, ADR del
+ * panel): snapshot de sesión a IndexedDB `e14-panel-sesion-v1` con
+ * rehidratación al montar; sin backend; el snapshot guarda solo este
+ * dispositivo. El export estático no cambia. La decisión completa (con los
+ * límites de cuota y los guards) vive en `snapshot-panel.ts`, cuya cabecera
+ * lleva la nota lista para el ADR. La cola durable del digitalizador sigue
+ * en IndexedDB de su módulo (masiva/cola).
  *
  * Fusión con el visor: `mock-repository.getActaDeMesa` consulta
  * `consultarActaRuntime()` y superpone las fotos sobre el acta base; el
@@ -47,6 +50,10 @@ import { validarJoinDivipola } from "./validacion-d25";
 // KIT recepcion-actas-v1 (D28): toda publicación deja su entrada en el
 // log de RECEPCIÓN (PUBLICADA/BLOQUEADA) — el embudo es este módulo.
 import { registrarRecepcion, type OrigenRecepcion } from "./recepcion-log";
+// R-55 — TERCERA FUENTE del gate: decisiones de Recepción (APROBADA/RECHAZADA
+// sobre entradas del log, con la clave de join D22 estampada). El módulo
+// importa recepcion-log — sin ciclo con actas-runtime.
+import { hayAprobacionParaClaveJoin } from "./decisiones-recepcion";
 // P-22 (plan 2026-11-12) — huellas del puente (shared, puras, sin DOM).
 import {
   UMBRAL_HAMMING_DHASH,
@@ -157,6 +164,11 @@ interface PaginaIndexada {
   idRecepcion: string;
 }
 
+/** R-54 — huella indexada EN SU FORMA DE SNAPSHOT: la identidad de página
+ *  (`idEnlace::mesa::formulario::paginaIndex`) viaja DENTRO del registro para
+ *  que el round-trip JSON sea plano (los consume snapshot-panel.ts). */
+export type HuellaPaginaSnapshot = PaginaIndexada & { identidad: string };
+
 const HUELLAS_PAGINA = new Map<string, PaginaIndexada>();
 
 function identidadDePagina(e: EntradaActaMasiva): string {
@@ -177,36 +189,136 @@ export function reiniciarIndicePaginas(): void {
   HUELLAS_PAGINA.clear();
 }
 
+// ─── R-54 — snapshot de sesión (snapshot-panel.ts) ──────────────────────
+// El snapshot vive en SU módulo: aquí solo se DISPARA por import dinámico
+// (un import estático cerraría el ciclo — snapshot-panel lee este estado por
+// extraer/fusionar). Fire-and-forget: jamás bloquea ni lanza; en SSR/bun
+// test el módulo es un no-op (guard de entorno interno).
+
+/** Dispara UNA vez por sesión la rehidratación del snapshot (al montar). */
+let rehidratacionAgendada = false;
+function agendarRehidratacion(): void {
+  if (rehidratacionAgendada) return;
+  rehidratacionAgendada = true;
+  void import("./snapshot-panel")
+    .then((m) => m.rehidratarSnapshotPanel())
+    .catch(() => {
+      /* sin snapshot disponible — la sesión sigue en memoria (conservador) */
+    });
+}
+
+/** Agenda el guardado DEBOUNCED (2 s) tras un cambio del embudo. */
+function agendarGuardadoSnapshotPanel(): void {
+  void import("./snapshot-panel")
+    .then((m) => m.agendarGuardadoSnapshot())
+    .catch(() => {
+      /* jamás rompe la publicación */
+    });
+}
+
 /** R-01 (auditoría 2026-11-16): vacía TODO el registro runtime — solo para
  *  pruebas. El singleton del módulo vivía entre archivos de `bun test` (que
  *  corre todas las suites en un mismo proceso): una suite que siembra actas
  *  (p. ej. hub-local-drenaje) contaminaba a las siguientes y hacía el
  *  resultado dependiente del ORDEN del readdir del clon. Cada suite llama
- *  esto en `beforeEach` y siembra SU propio estado determinista. */
+ *  esto en `beforeEach` y siembra SU propio estado determinista. NOTA R-54:
+ *  la prueba vacía JAMÁS toca el snapshot persistido (es de test). */
 export function vaciarActasRuntimeParaPrueba(): void {
   RUNTIME.clear();
   CLAVES_DEMO.clear();
   HUELLAS_PAGINA.clear();
 }
 
-/** Suscripción a publicaciones (patrón del módulo: sin libs nuevas). */
+// ─── R-54 — puente de extracción/fusión con snapshot-panel.ts ───────────
+
+/** Par (clave, acta) del runtime — la forma del store "actas" del snapshot. */
+export interface RegistroActaRuntime {
+  clave: string;
+  acta: ActaRealLista;
+}
+
+/** Extracción para el snapshot: TODOS los pares (clave, acta) del runtime
+ *  (el límite de 200 lo aplica snapshot-panel al serializar). */
+export function extraerActasParaSnapshot(): RegistroActaRuntime[] {
+  return Array.from(RUNTIME, ([clave, acta]) => ({ clave, acta }));
+}
+
+/** Extracción para el snapshot: huellas indexadas con su identidad de página. */
+export function extraerHuellasParaSnapshot(): HuellaPaginaSnapshot[] {
+  return Array.from(HUELLAS_PAGINA, ([identidad, h]) => ({
+    identidad,
+    huella: h.huella,
+    qrPayload: h.qrPayload,
+    dhash64: h.dhash64,
+    idRecepcion: h.idRecepcion,
+  }));
+}
+
+/** El acta del snapshot es servible (guard mínimo por si un registro viejo
+ *  llegó corrupto — snapshot-panel ya valida; esto es defensa en profundidad). */
+function esActaServible(acta: ActaRealLista): boolean {
+  return (
+    typeof acta.idEnlace === "string" &&
+    acta.idEnlace !== "" &&
+    typeof acta.mesa === "string" &&
+    acta.mesa !== "" &&
+    typeof acta.fotos === "object" &&
+    acta.fotos !== null
+  );
+}
+
+/** Fusión CONSERVADORA desde el snapshot (R-54): SOLO claves ausentes en
+ *  memoria — lo que la sesión viva ya tiene (más nuevo) jamás se pisa. Las
+ *  huellas siguen la misma regla por identidad de página. Devuelve cuántas
+ *  actas agregó (las huellas agregadas no cuentan: acompañan a su acta). */
+export function fusionarDesdeSnapshot(
+  actas: readonly RegistroActaRuntime[],
+  huellas: readonly HuellaPaginaSnapshot[]
+): number {
+  let agregadas = 0;
+  for (const { clave, acta } of actas) {
+    if (RUNTIME.has(clave)) continue;
+    if (!esActaServible(acta)) continue;
+    RUNTIME.set(clave, acta);
+    agregadas += 1;
+  }
+  for (const h of huellas) {
+    if (HUELLAS_PAGINA.has(h.identidad)) continue;
+    HUELLAS_PAGINA.set(h.identidad, {
+      huella: h.huella,
+      qrPayload: h.qrPayload,
+      dhash64: h.dhash64,
+      idRecepcion: h.idRecepcion,
+    });
+  }
+  return agregadas;
+}
+
+/** Suscripción a publicaciones (patrón del módulo: sin libs nuevas). R-54:
+ *  la primera llamada dispara la rehidratación del snapshot (lazy, una vez
+ *  por sesión — fire-and-forget, jamás bloquea la respuesta sincrónica). */
 export function suscribirseActasRuntime(oyente: Oyente): () => void {
+  agendarRehidratacion();
   oyentes.add(oyente);
   return () => {
     oyentes.delete(oyente);
   };
 }
 
-/** Registro runtime para la clave `${puestoId}::${mesaId}` (o null). */
+/** Registro runtime para la clave `${puestoId}::${mesaId}` (o null). R-54:
+ *  primera consulta → rehidratación lazy (misma señal que la suscripción). */
 export function consultarActaRuntime(
   puestoId: string,
   mesaId: string
 ): ActaRealLista | null {
+  agendarRehidratacion();
   return RUNTIME.get(`${puestoId}::${mesaId}`) ?? null;
 }
 
-/** ¿Hay acta runtime publicada para esta mesa? (antes de tocar el mock). */
+/** ¿Hay acta runtime publicada para esta mesa? (antes de tocar el mock). R-54:
+ *  el gate también dispara la rehidratación lazy (render sin suscripción). */
 export function hayActaRuntime(puestoId: string, mesaId: string): boolean {
+  agendarRehidratacion();
   return RUNTIME.has(`${puestoId}::${mesaId}`);
 }
 
@@ -232,11 +344,13 @@ export function contarActasRuntime(): number {
 //   · SIN_JOIN (solo `recepcion-log`, sin join confiable)   → ❌ NO
 //   · Rechazada en masiva: nunca llega a publicarse         → ❌ NO
 //   · Mesa NO_INICIADO (sin transmisión)                    → ❌ NO
-// BRECHA ABIERTA (decisión del mantenedor — docs/adr/README.md D-8): la APROBACIÓN en
-// Recepción HOY no produce ningún registro consultable por el repositorio
-// (`recepcion-log` solo documenta el embudo; no hay acción de aprobación
-// en `vista-recepcion.tsx`) → el gate usa runtime + sembradas; cuando
-// exista esa aprobación, se suma AQUÍ como tercera fuente.
+// BRECHA CERRADA (2026-11-19, R-55): la APROBACIÓN en Recepción produce hoy
+// un registro consultable por el repositorio — `decisiones-recepcion.ts`
+// (append-only, con la clave de join D22 `${idEnlace}::${mesa}` estampada
+// dentro del registro y persistida en el snapshot del panel). Es la TERCERA
+// FUENTE prometida aquí: una decisión APROBADA cuya clave corresponda a esta
+// mesa hace VISIBLE; RECHAZADA no suma visibilidad (el gate es ADITIVO —
+// jamás oculta lo ya visible por envío automático o por las sembradas).
 
 /**
  * Predicado ÚNICO de visibilidad del visor del Monitor Global (T8). Se
@@ -257,6 +371,10 @@ export function actaVisibleEnMonitor(
   // caso de una mesa cuyo snapshot del provider aún no refrescó: el acta
   // publicada de madrugada es alcanzable, hallazgo §8f).
   if (hayActaRuntime(puestoId, mesaId)) return true;
+  // TERCERA FUENTE (R-55) — aprobación registrada en Recepción: la decisión
+  // APROBADA cruza por la clave de join D22 `${idEnlace}::${mesa}` estampada
+  // al registrar (RECHAZADA jamás hace visible — ver bloque de arriba).
+  if (hayAprobacionParaClaveJoin(puestoId, mesaId)) return true;
   // Sembradas del demo (transmisiones recibidas del backlog) — cualquier
   // mesa que NO esté NO_INICIADO tiene acta servible por el repositorio.
   return mesa ? tieneActa(mesa) : false;
@@ -320,6 +438,11 @@ export async function publicarActaMasiva(
         ? { fechaOrigen: entrada.fechaOrigen }
         : {}),
     });
+    // R-54 — el embudo cambió el estado (log): agenda el snapshot DEBOUNCED
+    // (2 s). En SSR/bun test es un no-op (guard de entorno de snapshot-panel).
+    // El desenlace BLOQUEADO también merece snapshot: su fila del log es parte
+    // de la sesión (cuarentena visible tras recargar).
+    agendarGuardadoSnapshotPanel();
     return { ok: false, clave, motivo: motivoJoin };
   }
 
@@ -352,6 +475,9 @@ export async function publicarActaMasiva(
         ? { fechaOrigen: entrada.fechaOrigen }
         : {}),
     });
+    // R-54 — mismo gesto que la cuarentena (a)/(b): la fila BLOQUEADA también
+    // vive en el snapshot (ver comentario del desenlace anterior).
+    agendarGuardadoSnapshotPanel();
     return { ok: false, clave, motivo };
   }
 
@@ -415,6 +541,9 @@ export async function publicarActaMasiva(
         ? { fechaOrigen: entrada.fechaOrigen }
         : {}),
     });
+    // R-54 — la DUPLICADA dejó su fila en el log: snapshot DEBOUNCED (la fila
+    // con dupOf es parte de la trazabilidad que sobrevive la recarga).
+    agendarGuardadoSnapshotPanel();
     return { ok: true, clave, duplicada: true };
   }
 
@@ -518,6 +647,9 @@ export async function publicarActaMasiva(
   }
   // D-33 — la publicación demo deja constancia para su reinicio selectivo.
   if (origen === "demo") CLAVES_DEMO.add(clave);
+  // R-54 — publicación exitosa: agenda el snapshot DEBOUNCED (2 s — una
+  // ráfaga de lote escribe UNA vez). Fire-and-forget, jamás rompe el embudo.
+  agendarGuardadoSnapshotPanel();
   return { ok: true, clave };
 }
 
@@ -533,5 +665,17 @@ export function reiniciarDemoPanel(): number {
     if (RUNTIME.delete(clave)) retiradas += 1;
   }
   CLAVES_DEMO.clear();
+  // R-54 — el reinicio del demo es ACCIÓN DE USUARIO (no la prueba vacía):
+  // borra el snapshot persistido para que la recarga NO resucite el rastro
+  // demo y agenda un guardado nuevo con el estado POST-purga (el puente real
+  // y sus filas de log sobreviven la recarga). Fire-and-forget, jamás throw.
+  void import("./snapshot-panel")
+    .then(async (m) => {
+      await m.borrarSnapshotPanel();
+      m.agendarGuardadoSnapshot();
+    })
+    .catch(() => {
+      /* sin snapshot disponible — el reinicio sigue (conservador) */
+    });
   return retiradas;
 }

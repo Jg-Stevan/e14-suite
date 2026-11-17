@@ -28,9 +28,14 @@
  *     se siembra 1 vez perezosa (`asegurarSemilla`) con desfases fijos —
  *     misma disciplina determinística del mock (§0-7: nada aleatorio).
  *
- * MEMORIA DE SESIÓN (§0-5 / D8): sin persistencia y sin backend — recargar
- * la página restablece el log. Consumidores: la vista RECEPCIÓN
- * (`vista-recepcion.tsx`, suscripción) y el badge del sidebar (shell).
+ * PERSISTENCIA LOCAL MÍNIMA (R-54 — excepción documentada de D8, ADR del
+ * panel): el log entra al snapshot de sesión del panel (`snapshot-panel.ts`,
+ * IndexedDB `e14-panel-sesion-v1`, máx 2.000 entradas MÁS RECIENTES) y se
+ * rehidrata de forma CONSERVADORA al montar (solo ids ausentes en memoria —
+ * `fusionarRecepcionesDesdeSnapshot`, disparado lazy por actas-runtime en la
+ * primera consulta/suscripción). Sin backend; el snapshot guarda solo este
+ * dispositivo. Consumidores: la vista RECEPCIÓN (`vista-recepcion.tsx`,
+ * suscripción) y el badge del sidebar (shell).
  */
 
 import type { FormularioTipo } from "../domain/acta";
@@ -226,6 +231,51 @@ export function contarRecepciones(): {
     else sinJoin += 1;
   }
   return { total: ENTRADAS.length, publicadas, bloqueadas, sinJoin, duplicadas };
+}
+
+// ─── R-54 — fusión desde el snapshot del panel (snapshot-panel.ts) ─────────
+
+/** Entrada servible del snapshot (guard mínimo: id + fecha finitos — la
+ *  validación completa vive en snapshot-panel; esto es defensa en profundidad). */
+function esEntradaServible(e: EntradaRecepcion): boolean {
+  return (
+    typeof e.id === "string" &&
+    e.id !== "" &&
+    typeof e.fecha === "number" &&
+    Number.isFinite(e.fecha)
+  );
+}
+
+/**
+ * Fusión CONSERVADORA desde el snapshot (R-54): agrega SOLO las entradas
+ * cuyo `id` NO existe ya en el log — lo que la sesión viva ya tiene (más
+ * nuevo) jamás se pisa. La lista se re-ordena más-nuevas-primero (mismo
+ * gesto del sembrado: push + sort) y se notifica con `null` (cambio
+ * ESTRUCTURAL, no llegada — sin destello ni badge) solo si agregó filas.
+ * Devuelve cuántas agregó. Jamás lanza (los ítems sucios se saltan).
+ */
+export function fusionarRecepcionesDesdeSnapshot(
+  entradas: readonly EntradaRecepcion[]
+): number {
+  const presentes = new Set(ENTRADAS.map((e) => e.id));
+  let agregadas = 0;
+  for (const e of entradas) {
+    if (!esEntradaServible(e)) continue;
+    if (presentes.has(e.id)) continue;
+    presentes.add(e.id);
+    ENTRADAS.push(e);
+    agregadas += 1;
+  }
+  if (agregadas === 0) return 0;
+  ENTRADAS.sort((a, b) => b.fecha - a.fecha);
+  for (const oyente of oyentes) {
+    try {
+      oyente(null); // cambio estructural sin llegada (misma señal de la purga)
+    } catch {
+      /* un oyente caído jamás rompe la fusión */
+    }
+  }
+  return agregadas;
 }
 
 // ─── Semilla de INGESTA INICIAL (ancla estático SUP-6) ──────────────────────

@@ -6,8 +6,11 @@
  *   · RITMO / THROUGHPUT — llegadas en la ventana móvil de 60 s,
  *     expresadas en actas/min (R2).
  *   · PICO — máximo ritmo de la sesión: para cada llegada, cuántas cayeron
- *     en SU ventana de 60 s hacia atrás (O(n²) sobre un log de sesión —
- *     centenares de filas, costo despreciable).
+ *     en SU ventana de 60 s hacia atrás — sort O(n log n) + two-pointer
+ *     O(n) (R-53: el comentario decía «O(n²)» por una versión anterior del
+ *     cálculo; la implementación vigente nunca fue cuadrática).
+ *     R-53(b) — el sort corre SOLO cuando la LISTA cambia (llegadas);
+ *     por cada tick del reloj (1 s) la llamada reutiliza el orden cached.
  *   · FLUJO — 60 buckets de 1 s (barritas del sparkline, R3).
  *   · LATENCIA MEDIA — media de (fecha − fechaOrigen) sobre las filas que
  *     traen telemetría de origen (R5); sin datos → null (honestidad).
@@ -44,6 +47,40 @@ export interface MetricasFeed {
 const VENTANA_MS = 60_000;
 const BUCKETS = 60;
 
+// ─── R-53(b) — caché incremental del orden cronológico ──────────────────
+// La vista llama esta función POR CADA TICK del reloj (1 s) con la MISMA
+// lista (el `ahora` cambia, la lista no — `fuente` es un memo con identidad
+// estable entre llegadas). Re-sortear por tick es trabajo repetido: la caché
+// (clave = REFERENCIA del array + length) conserva el orden cronológico y el
+// sort O(n log n) solo corre cuando llegan entradas nuevas (referencia
+// nueva) o la lista mutó in place (length distinto). La función queda PURA
+// desde fuera: misma firma, mismo resultado, jamás muta la entrada.
+//
+// Asumisión documentada: el consumidor pasa COPIAS inmutables
+// (`consultarRecepciones()` devuelve `[...ENTRADAS]`) — una mutación in
+// place con idéntico length (patológica) no invalidaría la caché; el
+// sistema real jamás la produce (el log es append-only vía unshift + copia).
+let cacheRef: readonly EntradaRecepcion[] | null = null;
+let cacheLength = -1;
+let cacheFechas: number[] | null = null;
+
+/** Fechas del log en orden cronológico ASCENDENTE (caché por referencia). */
+function fechasOrdenadas(entradas: readonly EntradaRecepcion[]): number[] {
+  if (
+    cacheRef === entradas &&
+    cacheLength === entradas.length &&
+    cacheFechas !== null
+  ) {
+    return cacheFechas;
+  }
+  // Copia (`.map`) antes del sort: jamás se toca el array del consumidor.
+  const fechas = entradas.map((e) => e.fecha).sort((a, b) => a - b);
+  cacheRef = entradas;
+  cacheLength = entradas.length;
+  cacheFechas = fechas;
+  return fechas;
+}
+
 export function calcularMetricasFeed(
   entradas: readonly EntradaRecepcion[],
   ahora: number
@@ -55,11 +92,11 @@ export function calcularMetricasFeed(
     if (e.fecha > ahora - VENTANA_MS && e.fecha <= ahora) llegadasVentana += 1;
   }
 
-  // Pico histórico: mejor ventana de 60 s anclada en cada llegada.
+  // Pico histórico: mejor ventana de 60 s anclada en cada llegada
+  // (two-pointer sobre el orden cronológico — O(n) por tick, R-53(b)).
   let pico = 0;
   if (entradas.length > 0) {
-    // Orden cronológico ascendente para el barrido.
-    const fechas = entradas.map((e) => e.fecha).sort((a, b) => a - b);
+    const fechas = fechasOrdenadas(entradas);
     let j = 0;
     for (let k = 0; k < fechas.length; k++) {
       while (fechas[k]! - fechas[j]! > VENTANA_MS) j++;
