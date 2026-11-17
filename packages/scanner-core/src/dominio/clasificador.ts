@@ -430,8 +430,60 @@ const GAP_RESCATE = 0.05;
  *  ruta y sim SOLO si: mejor ≥ UMBRAL_SUGERIDA y gap ≥ 0.05 sobre el 2º
  *  (puesto DISTINTO; el mismo puesto evaluado con varias líneas cuenta una
  *  vez — máx). Con 2+ cercanos o nada reconocible → null (MANUAL, lista en
- *  panel §5). */
+ *  panel §5).
+ *
+ *  R-58 (ROADMAP móvil): el computo real vive en
+ *  `rescatarRutaPorNombreGlobalSinMemo` (abajo, byte-idéntico al de siempre);
+ *  esta envoltura lo MEMOIZA — el rescate por nombre costaba 130-360 ms por
+ *  acta cuando la cascada no resolvía, y el mismo texto re-clasificado (re-OCR
+ *  de secciones, revisión del editor, re-lectura del mismo acta) repetía el
+ *  barrido íntegro contra 14.438 puestos. MISMA respuesta para mismo
+ *  texto+base: la función es determinista (normalización + índice + umbrales
+ *  fijos), así que el memo es solo de ejecución y JAMÁS decide score/gate por
+ *  sí mismo — devuelve exactamente lo que computaría el computo. */
+const TOPE_MEMO_RESCATE = 200;
+
+/** Cache de rescate POR INSTANCIA de base: la clave del WeakMap es el OBJETO
+ *  `DivipolBase` — el catálogo recargado (`cargarDivipol` tras re-fetch) nace
+ *  como objeto NUEVO, de modo que la «invalidación explícita al recargar
+ *  catálogo» del plan es AUTOMÁTICA: no hay botón que pulsar ni TTL que
+ *  caduque tarde. Tope 200 entradas por base con eviction FIFO (mismo patrón
+ *  del `detMemo` de rapidocr.ts). */
+const cacheRescate = new WeakMap<
+  DivipolBase,
+  Map<string, (PuestoGlobal & { sim: number }) | null>
+>();
+
 function rescatarRutaPorNombreGlobal(
+  texto: string,
+  base: DivipolBase,
+): (PuestoGlobal & { sim: number }) | null {
+  let cache = cacheRescate.get(base);
+  if (!cache) {
+    cache = new Map();
+    cacheRescate.set(base, cache);
+  }
+  // La clave es el TEXTO OCR crudo: el ÚNICO parámetro que varía (la base va
+  // en la clave del WeakMap). `hit !== undefined` — Map guarda también los
+  // null (rescate sin candidato): un null cacheado es acierto, no ausencia.
+  const hit = cache.get(texto);
+  if (hit !== undefined) return hit;
+  const resultado = rescatarRutaPorNombreGlobalSinMemo(texto, base);
+  if (cache.size >= TOPE_MEMO_RESCATE) {
+    const masVieja = cache.keys().next().value; // 1.ª insertada = más vieja
+    if (masVieja !== undefined) cache.delete(masVieja);
+  }
+  cache.delete(texto); // si ya estaba (raro con el guard de arriba), renueva posición
+  cache.set(texto, resultado);
+  return resultado;
+}
+
+/** Computo del rescate SIN memo — la misma función de siempre (§3b.1). El
+ *  objeto retornado es DERIVADO ({...entrada, sim}: spread de la entrada del
+ *  índice), y el único consumidor (regla 4b en `clasificarCabecera`) SOLO lee
+ *  sus campos — compartir la MISMA referencia entre llamadas del mismo
+ *  texto+base es inofensivo (nadie lo muta ni lo persiste). */
+function rescatarRutaPorNombreGlobalSinMemo(
   texto: string,
   base: DivipolBase,
 ): (PuestoGlobal & { sim: number }) | null {
