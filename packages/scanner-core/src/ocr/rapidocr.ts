@@ -35,6 +35,13 @@
 // FASE 3 (§3.3): publicBase por entorno inyectado (mismo default que el core).
 import { publicBaseEfectivo } from "../dominio/entorno";
 import { medidasDeCaja } from "./crop-geometria";
+// KIT e14-post-det-worker-v1 (R-45, 2026-11-19): el postproceso DB del det
+// corre en el WORKER db-postprocess.worker.js (cliente db-postprocess-client.ts
+// — fallback local al módulo puro). `OpsDet` es el tipo CANÓNICO del módulo
+// puro: preDet produce este registro y el worker lo consume — importado de
+// allí (antes duplicado aquí; el módulo puro es la fuente).
+import type { OpsDet } from "./db-postprocess";
+import { dbPostprocessRemoto } from "./db-postprocess-client";
 
 // ─── Tipos ORT mínimos (el módulo se importa dinámicamente) ─────────────────
 
@@ -417,19 +424,6 @@ export function recKnobs(): {
 // ─── Pre-det (main.py fidelidad: reduce_max → increase_min → letterbox →
 //     det-preprocess round32) + registro de ops para mapear de vuelta ───────
 
-interface OpsDet {
-  w: number; // ancho final detIn
-  h: number;
-  /** ratio acumulado op1×op2 por eje (escala main.py preprocess). */
-  ratioW: number;
-  ratioH: number;
-  /** padding superior del letterbox (px del espacio post-op2). */
-  padTop: number;
-  /** ratio del det-preprocess final (round32 sobre el padded) por eje. */
-  ratioWDet: number;
-  ratioHDet: number;
-}
-
 // KIT e14-ocr-escalonado-v1 (§2.1): cap PARAMETRIZABLE — default DET_CAP_PROD
 // (byte a byte el flujo de hoy); el OCR escalonado pasa DET_CAP_RAPIDO en la
 // 1.ª pasada.
@@ -498,215 +492,15 @@ function preDet(
   };
 }
 
-/** Mapea puntos del detIn a coords de la FUENTE (inversa de las ops; clamp
- *  a bordes y redondeo — convención _get_origin_points del paquete). */
-function mapearAFuente(
-  p: { x: number; y: number },
-  ops: OpsDet,
-  srcW: number,
-  srcH: number,
-): { x: number; y: number } {
-  // inversa secuencial: det-preprocess final (round32 sobre el padded) →
-  // letterbox (−padTop) → main preprocess (op1×op2). Clamp a bordes + round
-  // (convención _get_origin_points del paquete).
-  const xPostPad = p.x / ops.ratioWDet;
-  const yPostPad = p.y / ops.ratioHDet - ops.padTop;
-  const x = xPostPad / ops.ratioW;
-  const y = yPostPad / ops.ratioH;
-  return {
-    x: Math.max(0, Math.min(srcW, Math.round(x))),
-    y: Math.max(0, Math.min(srcH, Math.round(y))),
-  };
-}
-
-// ─── Post det (DBPostProcess en JS puro) ────────────────────────────────────
-
-const DB_THRESH = 0.3;
-const DB_BOX_THRESH = 0.5;
-const DB_MAX_CANDIDATES = 1000;
-const DB_UNCLIP_RATIO = 1.6;
-const MIN_SIDE_DESCARTAR = 3;
-const MIN_SIDE_TRAS_UNCLIP = 5;
+// KIT e14-post-det-worker-v1 (R-45, 2026-11-19): el postproceso DB y sus
+// auxiliares (consts DB_*/MIN_*, mapearAFuente, Rect, convexHull,
+// minAreaRect, boxScoreFast, esquinasRect, ordenarCajas) viven en
+// src/ocr/db-postprocess.ts (módulo puro — transcripción literal del bloque
+// que corría inline en inferDet) y corren en el WORKER
+// db-postprocess.worker.js vía dbPostprocessRemoto — borrados de aquí tras
+// el rewiring (0 referencias restantes, verificado con rg). TEXT_SCORE se
+// queda: es del filtro de conf del REC.
 const TEXT_SCORE = 0.5;
-
-interface Rect {
-  cx: number;
-  cy: number;
-  w: number;
-  h: number;
-  /** ángulo del eje mayor (rad, dirección d̂). */
-  theta: number;
-}
-
-/** Convex hull (monotone chain) de un conjunto de puntos. */
-function convexHull(pts: { x: number; y: number }[]): { x: number; y: number }[] {
-  if (pts.length < 3) return pts.slice();
-  const p = pts.slice().sort((a, b) => (a.x === b.x ? a.y - b.y : a.x - b.x));
-  const cross = (o: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) =>
-    (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
-  const lower: { x: number; y: number }[] = [];
-  for (const q of p) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0)
-      lower.pop();
-    lower.push(q);
-  }
-  const upper: { x: number; y: number }[] = [];
-  for (let i = p.length - 1; i >= 0; i--) {
-    const q = p[i];
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0)
-      upper.pop();
-    upper.push(q);
-  }
-  lower.pop();
-  upper.pop();
-  return lower.concat(upper);
-}
-
-/** min-area rect por barrido de aristas del hull (proyectar sobre el eje de
- *  cada arista y su perpendicular; quedarse con el área mínima). */
-function minAreaRect(hull: { x: number; y: number }[]): Rect | null {
-  if (hull.length < 2) return null;
-  let mejor: Rect | null = null;
-  let mejorArea = Infinity;
-  const n = hull.length;
-  for (let i = 0; i < n; i++) {
-    const p1 = hull[i];
-    const p2 = hull[(i + 1) % n];
-    const dx = p2.x - p1.x;
-    const dy = p2.y - p1.y;
-    const len = Math.hypot(dx, dy);
-    if (len < 1e-6) continue;
-    const ux = dx / len;
-    const uy = dy / len; // eje de la arista
-    let minU = Infinity;
-    let maxU = -Infinity;
-    let minV = Infinity;
-    let maxV = -Infinity;
-    for (const q of hull) {
-      const u = q.x * ux + q.y * uy;
-      const v = -q.x * uy + q.y * ux; // perpendicular n̂ = (−uy, ux)
-      if (u < minU) minU = u;
-      if (u > maxU) maxU = u;
-      if (v < minV) minV = v;
-      if (v > maxV) maxV = v;
-    }
-    const w = maxU - minU;
-    const h = maxV - minV;
-    const area = w * h;
-    if (area < mejorArea) {
-      mejorArea = area;
-      mejor = {
-        cx: ((maxU + minU) / 2) * ux + ((maxV + minV) / 2) * -uy,
-        cy: ((maxU + minU) / 2) * uy + ((maxV + minV) / 2) * ux,
-        w,
-        h,
-        theta: Math.atan2(uy, ux),
-      };
-    }
-  }
-  return mejor;
-}
-
-/** box_score_fast: media de `pred` dentro del quad (bbox + máscara por
- *  punto-en-polígono, scanline por cruce de aristas). */
-function boxScoreFast(pred: Float32Array, w: number, h: number, box: { x: number; y: number }[]): number {
-  let xmin = w - 1;
-  let xmax = 0;
-  let ymin = h - 1;
-  let ymax = 0;
-  for (const q of box) {
-    xmin = Math.max(0, Math.min(xmin, Math.floor(q.x)));
-    xmax = Math.min(w - 1, Math.max(xmax, Math.ceil(q.x)));
-    ymin = Math.max(0, Math.min(ymin, Math.floor(q.y)));
-    ymax = Math.min(h - 1, Math.max(ymax, Math.ceil(q.y)));
-  }
-  if (xmax < xmin || ymax < ymin) return 0;
-  let suma = 0;
-  let cuenta = 0;
-  for (let y = ymin; y <= ymax; y++) {
-    // intersecciones de la scanline y con las aristas del polígono
-    const xs: number[] = [];
-    for (let i = 0; i < box.length; i++) {
-      const a = box[i];
-      const b = box[(i + 1) % box.length];
-      if (a.y === b.y) continue;
-      const yMin = Math.min(a.y, b.y);
-      const yMax = Math.max(a.y, b.y);
-      if (y + 0.5 >= yMin && y + 0.5 < yMax) {
-        xs.push(a.x + ((y + 0.5 - a.y) * (b.x - a.x)) / (b.y - a.y));
-      }
-    }
-    if (xs.length < 2) continue;
-    xs.sort((a, b) => a - b);
-    for (let k = 0; k + 1 < xs.length; k += 2) {
-      const x0 = Math.max(xmin, Math.ceil(xs[k] - 0.5));
-      const x1 = Math.min(xmax, Math.floor(xs[k + 1] - 0.5));
-      for (let x = x0; x <= x1; x++) {
-        if (x >= xs[k] && x <= xs[k + 1]) {
-          suma += pred[y * w + x];
-          cuenta++;
-        }
-      }
-    }
-  }
-  return cuenta === 0 ? 0 : suma / cuenta;
-}
-
-/** Esquinas de un rect expandido (centro + ángulo), ordenadas TL,TR,BR,BL
- *  (convención get_mini_boxes: sort por x, pares por y). */
-function esquinasRect(r: Rect): { x: number; y: number }[] {
-  const cos = Math.cos(r.theta);
-  const sin = Math.sin(r.theta);
-  const nx = -sin;
-  const ny = cos;
-  const hw = r.w / 2;
-  const hh = r.h / 2;
-  const pts = [
-    { x: r.cx + hw * cos + hh * nx, y: r.cy + hw * sin + hh * ny },
-    { x: r.cx + hw * cos - hh * nx, y: r.cy + hw * sin - hh * ny },
-    { x: r.cx - hw * cos + hh * nx, y: r.cy - hw * sin + hh * ny },
-    { x: r.cx - hw * cos - hh * nx, y: r.cy - hw * sin - hh * ny },
-  ];
-  pts.sort((a, b) => a.x - b.x);
-  let tl: { x: number; y: number };
-  let bl: { x: number; y: number };
-  let tr: { x: number; y: number };
-  let br: { x: number; y: number };
-  if (pts[0].y <= pts[1].y) {
-    tl = pts[0];
-    bl = pts[1];
-  } else {
-    tl = pts[1];
-    bl = pts[0];
-  }
-  if (pts[2].y <= pts[3].y) {
-    tr = pts[2];
-    br = pts[3];
-  } else {
-    tr = pts[3];
-    br = pts[2];
-  }
-  return [tl, tr, br, bl];
-}
-
-/** sorted_boxes estándar PaddleOCR: por y superior; solapamiento vertical
- *  (< 10 px) → por x (insert estabilizado del original). */
-function ordenarCajas(boxes: { x: number; y: number }[][]): { x: number; y: number }[][] {
-  const sorted = boxes.slice().sort((a, b) => a[0].y - b[0].y || a[0].x - b[0].x);
-  for (let i = 0; i < sorted.length - 1; i++) {
-    for (let j = i; j >= 0; j--) {
-      if (
-        Math.abs(sorted[j + 1][0].y - sorted[j][0].y) < 10 &&
-        sorted[j + 1][0].x < sorted[j][0].x
-      ) {
-        const tmp = sorted[j];
-        sorted[j] = sorted[j + 1];
-        sorted[j + 1] = tmp;
-      } else break;
-    }
-  }
-  return sorted;
-}
 
 // ─── Crops, cls, rec ────────────────────────────────────────────────────────
 
@@ -951,97 +745,24 @@ async function inferDet(
   const pred = out.data as Float32Array;
   const pw = out.dims[3];
   const ph = out.dims[2];
+  // KIT e14-post-det-worker-v1 (R-45, 2026-11-19): el postproceso DB
+  // (binarizar > 0.3 → dilate 2×2 → CCL → hull → min-area rect → score →
+  // unclip → esquinas + mapeo) corría INLINE aquí — un único bloque síncrono
+  // de hasta 7,25 s medidos que congelaba el hilo principal. Ahora corre en
+  // el WORKER db-postprocess.worker.js vía dbPostprocessRemoto: MISMO módulo
+  // puro (db-postprocess.ts, transcripción literal caracterizada por el test
+  // del supervisor), MISMO contrato {boxesFuente, nBoxes}; `ops` es el
+  // registro EXACTO que preDet produce (el mismo shape que consumía el
+  // bloque inline). Worker ausente/roto/vencido ⇒ el módulo puro corre
+  // local (jamás throw, jamás reintento tras rotura — doctrina del
+  // conservador). SIN transfer list: el fallback local necesita `pred`
+  // vivo y el memo DetMemoEntrada guarda DetSalida (NUNCA pred — verificado).
+  const post = await dbPostprocessRemoto(pred, pw, ph, ops, src.naturalWidth, src.naturalHeight);
+  // msDet cierra al RECIBIR el resultado del worker: preDet + det.run + post
+  // completo (la fase det ES esto — el round-trip del post entra en su
+  // medición, misma semántica observable de fase, ahora sin congelar la UI).
   const msDet = Math.round(performance.now() - t0);
-
-  // 1) binarizar > 0.3
-  const bitmap = new Uint8Array(pw * ph);
-  for (let i = 0; i < bitmap.length; i++) bitmap[i] = pred[i] > DB_THRESH ? 1 : 0;
-
-  // 2) dilate 2×2 (max local con kernel [[1,1],[1,1]] — crece derecha/abajo)
-  const dil = new Uint8Array(pw * ph);
-  for (let y = 0; y < ph; y++) {
-    const fila = y * pw;
-    const filaPrev = Math.max(0, y - 1) * pw;
-    for (let x = 0; x < pw; x++) {
-      const xPrev = Math.max(0, x - 1);
-      const v = Math.max(
-        bitmap[fila + x],
-        bitmap[filaPrev + x],
-        bitmap[fila + xPrev],
-        bitmap[filaPrev + xPrev],
-      );
-      dil[fila + x] = v;
-    }
-  }
-
-  // 3) CCL 4-conectividad (BFS, máx 1000 componentes)
-  const labels = new Int32Array(pw * ph); // 0 = no visitado
-  let nComp = 0;
-  const rects: Rect[] = [];
-  const stack = new Int32Array(pw * ph);
-  const coords: number[] = [];
-  for (let y = 0; y < ph && nComp < DB_MAX_CANDIDATES; y++) {
-    for (let x = 0; x < pw && nComp < DB_MAX_CANDIDATES; x++) {
-      const idx = y * pw + x;
-      if (dil[idx] === 0 || labels[idx] !== 0) continue;
-      nComp++;
-      let sp = 0;
-      stack[sp++] = idx;
-      labels[idx] = nComp;
-      coords.length = 0;
-      while (sp > 0) {
-        const cur = stack[--sp];
-        const cy = (cur / pw) | 0;
-        const cx = cur - cy * pw;
-        coords.push(cx, cy);
-        // vecinos (4-con)
-        if (cx > 0 && dil[cur - 1] === 1 && labels[cur - 1] === 0) {
-          labels[cur - 1] = nComp;
-          stack[sp++] = cur - 1;
-        }
-        if (cx < pw - 1 && dil[cur + 1] === 1 && labels[cur + 1] === 0) {
-          labels[cur + 1] = nComp;
-          stack[sp++] = cur + 1;
-        }
-        if (cy > 0 && dil[cur - pw] === 1 && labels[cur - pw] === 0) {
-          labels[cur - pw] = nComp;
-          stack[sp++] = cur - pw;
-        }
-        if (cy < ph - 1 && dil[cur + pw] === 1 && labels[cur + pw] === 0) {
-          labels[cur + pw] = nComp;
-          stack[sp++] = cur + pw;
-        }
-      }
-      const nPx = coords.length / 2;
-      if (nPx < 10) continue; // ruido (findContours de <10 px tampoco aporta)
-      // submuestreo si > 20000 px
-      const stride = nPx > 20000 ? Math.ceil(nPx / 20000) : 1;
-      const pts: { x: number; y: number }[] = [];
-      for (let k = 0; k < nPx; k += stride) pts.push({ x: coords[k * 2], y: coords[k * 2 + 1] });
-      const hull = convexHull(pts);
-      const rect = minAreaRect(hull);
-      if (!rect) continue;
-      const sside = Math.min(rect.w, rect.h);
-      if (sside < MIN_SIDE_DESCARTAR) continue;
-      // esquinas del rect (pre-unclip) para el score
-      const esq = esquinasRect(rect);
-      const score = boxScoreFast(pred, pw, ph, esq);
-      if (score < DB_BOX_THRESH) continue;
-      // unclip (rect es exacto): d = área·ratio / perímetro; w += 2d, h += 2d
-      const perim = 2 * (rect.w + rect.h);
-      const dUnclip = (rect.w * rect.h * DB_UNCLIP_RATIO) / perim;
-      const wU = rect.w + 2 * dUnclip;
-      const hU = rect.h + 2 * dUnclip;
-      if (Math.min(wU, hU) < MIN_SIDE_TRAS_UNCLIP) continue;
-      rects.push({ cx: rect.cx, cy: rect.cy, w: wU, h: hU, theta: rect.theta });
-    }
-  }
-
-  // 4) esquinas TL,TR,BR,BL + mapeo a coords de la FUENTE
-  const boxesFuente = rects
-    .map((r) => esquinasRect(r).map((p) => mapearAFuente(p, ops, src.naturalWidth, src.naturalHeight)))
-    .filter((b) => b.every((p) => p.x >= 0 && p.y >= 0));
-  const salida: DetSalida = { boxesFuente: ordenarCajas(boxesFuente), msDet, nBoxes: rects.length };
+  const salida: DetSalida = { boxesFuente: post.boxesFuente, msDet, nBoxes: post.nBoxes };
   // D62 T2 — MISS: alimenta el memo (tope 2; insertar desplaza la más vieja).
   if (claveOrigen != null) detMemoGuardar(claveOrigen, { cap, ...salida });
   return salida;
@@ -1066,6 +787,10 @@ export async function rapidOcrReconocer(
     esperaSink?: EsperaOcrSink;
   },
 ): Promise<RapidOcrResultado> {
+  // KIT e14-init-por-intencion-v1 (R-47): el primer gesto de escaneo arranca
+  // la descarga de modelos (fire-and-forget — si ya está caliente resuelve
+  // al instante; el await real del caller llega por rapidOcrInit).
+  void asegurarRapidOcr().catch(() => {});
   // FASE 3 — salud del motor (de S): contar la inferencia para el reinicio
   // seguro (reiniciarMotorOcrSiInactivo). Cero costo en la ruta.
   reconocimientosEnVuelo++;
@@ -1147,9 +872,12 @@ async function rapidOcrReconocerInterno(
   // (~55 %), y yields entre fases (det → crops → cls/rec) para que el hilo
   // principal pinte entre bloques. El rec escala SOLO su tramo desde el 55 %
   // (MONÓTONO — antes el 1.er lote reportaba ~0.15 y cualquier emisión previa
-  // hacía RETROCEDER el anillo). LÍMITE CONOCIDO (plan v2 §C1): la fase 1 NO
-  // fragmenta el postproceso DB (un único bloque síncrono dentro de det —
-  // hasta 7,25 s medidos); eso es la fase 2 (worker DB).
+  // hacía RETROCEDER el anillo). FASE 2 APLICADA — KIT e14-post-det-worker-v1
+  // (R-45, 2026-11-19): el postproceso DB que aquí era un único bloque
+  // síncrono dentro de det (hasta 7,25 s medidos) corre en el WORKER
+  // db-postprocess.worker.js (cliente db-postprocess-client.ts; fallback
+  // local al módulo puro db-postprocess.ts si el worker no está, roto o
+  // vencido) — el hilo principal deja de congelarse durante el det.
   const ceder = async (): Promise<void> => {
     await new Promise<void>((r) => setTimeout(r, 0));
   };
@@ -1386,6 +1114,10 @@ export async function rapidOcrCropsOrientacion(
   k: number,
   esperaSink?: EsperaOcrSink,
 ): Promise<{ crops: HTMLCanvasElement[]; w: number; h: number; msDet: number }> {
+  // KIT e14-init-por-intencion-v1 (R-47): intención del probe — mismo
+  // fire-and-forget que el reconocer (el probe corre ANTES de la 1.ª pasada;
+  // si el usuario jamás llegó aquí, nada se descargó).
+  void asegurarRapidOcr().catch(() => {});
   const src = await loadImageMemo(dataUrl); // SPRINT-A A2 — decode memoizado del repo
   // D56 §3 T2: det del probe a DET_CAP_RAPIDO (banco B3 GO: −56%, 0 cajas
   // perdidas) — el probe no necesita det de producción, sí caber en presupuesto.
@@ -1491,9 +1223,24 @@ async function rapidOcrRecLoteInterno(
 // (kit fuera-informes retiró a sus consumidores; 0 refs en src/, verificado
 // con rg). WebGPU sigue anotado, no usado (EP wasm fijo, determinismo).
 
-// KIT e14-motor-rapidocr-v1 (PROD-2 §4.1-C5): pre-warm al importar el módulo
-// (el bridge lo importa → arranca ANTES de la primera captura SIN tocar
-// ScanView, intocable). Singleton compartido: producción e informe pagan la
-// carga (~1.1 s) UNA sola vez por sesión. Silencioso: si falla aquí, la
-// primera captura reintenta vía rapidOcrInit (reintentable).
-if (typeof window !== "undefined") void rapidOcrInit().catch(() => {});
+// KIT e14-init-por-intencion-v1 (R-47, 2026-11-19): el pre-warm AL IMPORTAR
+// el módulo (KIT e14-motor-rapidocr-v1, PROD-2 §4.1-C5) se RETIRA —
+// descargaba ~30 MB (wasm ORT + det/cls/rec + dict) al importar el módulo
+// aunque el usuario jamás escaneara. AHORA la descarga es POR INTENCIÓN:
+//   · asegurarRapidOcr() — alias memoizado de rapidOcrInit (mismo singleton,
+//     reintentable) que los puntos de entrada públicos del OCR invocan
+//     fire-and-forget al ARRANCAR: el primer gesto de escaneo descarga Y
+//     funciona igual que con el pre-warm de import.
+//   · rapidOcrPrecalentar() (ScanView/orquestador de masiva) sigue igual:
+//     calienta ADEMÁS con una inferencia real al montar la pantalla.
+// La intención JAMÁS lanza: .catch(() => {}) — un fallo de descarga lo paga
+// el escaneo con su propio rapidOcrInit (reintentable), no el import.
+
+/** init por intención — descarga los ~30 MB en el primer gesto de escaneo,
+ *  no al importar. Alias memoizado de rapidOcrInit: mismo singleton de
+ *  sesión (una sola descarga por carga de página), mismo reintento ante
+ *  fallo. Los puntos de entrada del motor lo invocan fire-and-forget
+ *  (`void asegurarRapidOcr().catch(() => {})` — la intención jamás lanza). */
+export function asegurarRapidOcr(): Promise<RapidRuntime> {
+  return rapidOcrInit();
+}

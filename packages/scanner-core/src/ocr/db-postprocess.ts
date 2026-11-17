@@ -2,10 +2,13 @@
  * db-postprocess.ts — R7c (M8): postproceso DB de detección como MÓDULO PURO
  * (sin estado de módulo — todas las funciones son puras y las constantes,
  * const). Transcripción LITERAL desde `ocr/rapidocr.ts` (patrón R7a: el
- * original vive inline dentro de `inferDet`, función async de ORT con
- * canvas — NO invocable headless; este módulo nace en el commit de TESTS
- * como transcripción byte a byte y el cableado de `inferDet` llega en el
- * commit de refactor inmediato. Origen citado línea a línea).
+ * original vivía inline dentro de `inferDet`, función async de ORT con
+ * canvas — NO invocable headless; este módulo nació en el commit de TESTS
+ * como transcripción byte a byte. CABLEADO APLICADO — KIT
+ * e14-post-det-worker-v1, R-45, 2026-11-19: `inferDet` ya NO ejecuta el
+ * bloque inline — lo corre el WORKER `db-postprocess.worker.js` vía
+ * `db-postprocess-client.ts` (fallback local = ESTE módulo, mismo
+ * resultado). Origen citado línea a línea).
  *
  * Origen (rapidocr.ts en la base de R7c, commit 710f8c6):
  *   · OpsDet                  — L590-601
