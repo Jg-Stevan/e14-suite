@@ -1,0 +1,55 @@
+# CI de PARIDAD de los gemelos de calidad — R-59 (2026-11-19).
+#
+# Los módulos gemelos de calidad del móvil (digielect14) y del panel
+# (supervision-e14) comparten por contrato su DECISIÓN: mismas métricas de
+# entrada → mismo contraste efectivo y mismo score. Esa paridad la protege
+# scripts/qa-paridad-calidad.mjs (vectores de contrato compartidos sobre las
+# funciones puras contrasteEfectivoDe/scoreDeCalidad — la parte DOM queda
+# fuera por diseño, ver cabecera del script).
+#
+# Gate duro: exit 0 = paridad · exit 1 = drift (rompe el PR).
+# NOTA: los pipelines gemelos (digielect14/src/lib/e14/pipeline.ts ↔
+# supervision-e14/…/e14/pipeline.ts) NO tienen gate a propósito — solapamiento
+# textual medido ~7 % (81/1145 líneas comunes), divergencia intencional
+# documentada en su cabecera GEMELO (R-59).
+
+name: ci — paridad gemelos (calidad)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/qa-paridad-calidad.mjs"
+      - "apps/digielect14/src/lib/e14/bridge/calidad.ts"
+      - "apps/supervision-e14/src/modules/digitalizador/lib/e14/calidad.ts"
+      - "packages/scanner-core/**"
+  pull_request:
+    paths:
+      - "scripts/qa-paridad-calidad.mjs"
+      - "apps/digielect14/src/lib/e14/bridge/calidad.ts"
+      - "apps/supervision-e14/src/modules/digitalizador/lib/e14/calidad.ts"
+      - "packages/scanner-core/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-paridad-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  paridad:
+    runs-on: ubuntu-latest
+    steps:
+      # Pines por SHA (R-13, mismo estándar del repo): un tag re-publicado jamás ejecuta código sin revisión.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.2"
+
+      - name: instalar workspaces (lockfile de la raíz — el script importa @jg-stevan/scanner-core vía los gemelos)
+        run: bun install --frozen-lockfile
+
+      - name: gate de paridad de decisión (0 = paridad, 1 = drift)
+        run: bun scripts/qa-paridad-calidad.mjs

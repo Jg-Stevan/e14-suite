@@ -1,4 +1,11 @@
 /**
+ * GEMELO (R-59, 2026-11-19): solapamiento textual medido ~7 % (81/1145 líneas
+ * comunes) con el hermano apps/digielect14/src/lib/e14/pipeline.ts — la parte
+ * compartida real vive en pipeline-comun.ts (ESTE app) y en
+ * packages/scanner-core; divergencia intencional documentada, SIN gate de
+ * paridad por diseño (la paridad de decisión del motor la sostienen los
+ * golden del paquete; aquí solo divergen etapas y copy de logs).
+ *
  * Pipeline L2 — ARCHIVO y CÁMARA (FASE F del plan post-v2.3).
  *
  * Extracción MOVE-ONLY del cuerpo de `RealCoreBridge.pipeline()` que vivía en

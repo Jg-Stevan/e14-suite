@@ -1,4 +1,14 @@
 /**
+ * GEMELO (R-59, 2026-11-19): divergencia intencional mínima respecto del
+ * hermano apps/digielect14/src/lib/e14/bridge/calidad.ts; paridad de decisión
+ * protegida por scripts/qa-paridad-calidad.mjs (CI ci-paridad). Divergencias
+ * conocidas: imports/comentarios — este lado duplica inline la fórmula del
+ * level (0.45/0.25/0.3, umbrales 80/62/45 — packages/ es intocable para el
+ * panel) y los techos 7.9/6.4 como literales, con TECHO_SIN_SENAL desde
+ * ./gate; el hermano móvil importa la fórmula del paquete y los techos de su
+ * politica/umbrales. Lógica de decisión (contrasteEfectivoDe/scoreDeCalidad)
+ * BYTE-EQUIVALENTE — el gate de paridad la ejecuta headless.
+ *
  * calidad.ts — R7b (M1): medición de CALIDAD del acta y mapeo a score.
  *
  * MOVIDO verbatim de `scanner-core-bridge.ts` (partición move-only,

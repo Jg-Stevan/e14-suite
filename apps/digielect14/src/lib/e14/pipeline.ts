@@ -1,4 +1,12 @@
 /**
+ * GEMELO (R-59, 2026-11-19): solapamiento textual medido ~7 % (81/1145 líneas
+ * comunes) con el hermano apps/supervision-e14/src/modules/digitalizador/lib/
+ * e14/pipeline.ts — la parte compartida real vive en pipeline-comun.ts
+ * (supervision) y en packages/scanner-core; divergencia intencional
+ * documentada, SIN gate de paridad por diseño (la paridad de decisión del
+ * motor la sostienen los golden del paquete; aquí solo divergen etapas y
+ * copy de logs).
+ *
  * Pipeline §5 (ARCHIVO y CAMARA comparten etapas y mapeo; ms por etapa en
  * consola).
  *
