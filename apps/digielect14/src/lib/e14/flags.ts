@@ -8,10 +8,12 @@
  *
  * flags.json es un archivo ESTÁTICO en public/ (hoy NO existe → «sin-
  * endpoint»): el mantenedor lo puede desplegar/editar sin tocar el código —
- * same-origin con NEXT_PUBLIC_BASE_PATH (mismo patrón PUBLIC_BASE del core).
+ * same-origin con el PUBLIC_BASE de la app (fuente única src/shared/env.ts,
+ * R-46; el core recibe el mismo valor por inyección — dominio/entorno.ts).
  *
  * SIN dependencias nuevas: fetch nativo + reintentos exponenciales.
  */
+import { PUBLIC_BASE } from "@/shared/env"; // R-46 — fuente única (era const local con env crudo)
 import { leerOverridesFlags } from "./obs/politica";
 import type { FlagsApp } from "./obs/tipos";
 import {
@@ -20,7 +22,6 @@ import {
   type OpcionesRescateHeic,
 } from "@jg-stevan/scanner-core/core/image-processor";
 
-const PUBLIC_BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const REFRESH_MS = 24 * 60 * 60 * 1000;
 const REINTENTO_BASE_MS = 60_000;
 const REINTENTO_TOPE_MS = REFRESH_MS;

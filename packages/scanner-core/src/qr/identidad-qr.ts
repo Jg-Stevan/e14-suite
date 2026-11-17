@@ -42,7 +42,8 @@
  *                                servido LOCAL desde public/wasm/
  *                                zxing_reader.wasm vía
  *                                setZXingModuleOverrides({ locateFile })
- *                                con base `${NEXT_PUBLIC_BASE_PATH}/wasm/`
+ *                                con base INYECTADA — urlAssetPublico
+ *                                (dominio/entorno.ts, R-46)
  *   5. tier ROTACIÓN           — A rotada 90°→180°→270° (última)
  *   → early-exit al primer payload · JAMÁS throw · trazaQr
  *     `[e14] qr-capa0 tier=base|barrido|zxing|rotacion90|…|null ms=…`
@@ -69,6 +70,9 @@
 import type { Binarizer, ReaderOptions } from "zxing-wasm/reader";
 import { canvasCon, decodeImagenLru } from "../dominio/image-utils"; // SPRINT-A A1/A3 — decode-once LRU + factory de canvas
 import { logger } from "../dominio/logger"; // SPRINT-A A6 — console→logger (mensajes byte-idénticos)
+// R-46 — el wasm se sirve con el publicBase INYECTADO (urlAssetPublico:
+// lazy en el punto de uso, jamás env crudo ni const congelada al importar).
+import { urlAssetPublico } from "../dominio/entorno";
 // ─── KIT e73-sondeo-qr-precoz-v1 (§A.2) — refactor puro ADITIVO ───────────
 // El núcleo puro de píxeles (PixelesQr · EspecieBanda · BANDAS_BASE/BANDA_A ·
 // intentoSobrePixeles · rotar90/rotarPixeles) vive en qr-pixeles.ts
@@ -180,8 +184,9 @@ let modZxing: ModZxing | null | undefined;
  * Carga DIFERIDA del módulo zxing (doc hermano §1: `import("zxing-wasm/
  * reader")` + wasm servido LOCAL desde public/wasm/ vía
  * setZXingModuleOverrides({ locateFile }) con base
- * `${NEXT_PUBLIC_BASE_PATH ?? ""}/wasm/`). Una sola tentativa por sesión
- * (caché); falla → null CON traza de indisponibilidad (T-0.1 del e64 —
+ * `${publicBaseEfectivo()}/wasm/` — R-46: vía urlAssetPublico). Una sola
+ * tentativa por sesión (caché); falla → null CON traza de indisponibilidad
+ * (T-0.1 del e64 —
  * doc hermano F-0.2) y el pipeline degrada a solo-jsQR. Jamás throw.
  *
  * KIT e14-orientacion-qr-v1 — EXPORTADO ADITIVO: la brújula QR de
@@ -195,7 +200,7 @@ export async function moduloZxingDe(): Promise<ModZxing | null> {
     const mod = await import("zxing-wasm/reader");
     mod.setZXingModuleOverrides({
       locateFile: (archivo: string) =>
-        `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/wasm/${archivo}`,
+        urlAssetPublico(`/wasm/${archivo}`), // R-46 — prefijo inyectado, resuelto lazy
     });
     modZxing = mod;
   } catch {

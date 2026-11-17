@@ -15,7 +15,7 @@
  * Contratos heredados del tier zxing (e63n + e64 §7, byte a byte en espíritu):
  * · Carga DIFERIDA con UNA tentativa por sesión (caché módulo|indisponible).
  * · wasm servido LOCAL desde public/wasm/zbar.wasm vía setModuleArgs({
- *   locateFile }) con base `${NEXT_PUBLIC_BASE_PATH}/wasm/` — MISMA doctrina
+ *   locateFile }) con base `${PUBLIC_BASE}/wasm/` — MISMA doctrina
  *   que zxing_reader.wasm (offline primero; sin red jamás carga el tier).
  * · JAMÁS throw: cualquier falla = null = el ladder sigue (red line e64 §7-4).
  * · PROHIBIDO en el worker (misma red line e73 que zxing: el bundle del
@@ -24,6 +24,10 @@
  *   typeName; el payload sigue siendo llave opaca, red line 10 intacta).
  */
 import { logger } from "../../logger";
+// R-46 — fuente única de la app (src/shared/env.ts): el locateFile leía el
+// env crudo en vez del PUBLIC_BASE de la app — mismo valor, una sola casa
+// (mismo patrón que sondeo-qr.client.ts / prescan-qr.client.ts).
+import { PUBLIC_BASE } from "@/shared/env";
 import type { PixelesQr } from "@jg-stevan/scanner-core/qr/qr-pixeles";
 
 type ModZbar = typeof import("@undecaf/zbar-wasm");
@@ -43,7 +47,7 @@ export async function moduloZbarDe(): Promise<ModZbar | null> {
     const mod = await import("@undecaf/zbar-wasm");
     mod.setModuleArgs({
       locateFile: () =>
-        `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/wasm/zbar.wasm`,
+        `${PUBLIC_BASE}/wasm/zbar.wasm`, // R-46 — fuente única @/shared/env (era env crudo)
     });
     modZbar = mod;
   } catch {

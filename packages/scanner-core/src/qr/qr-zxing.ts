@@ -31,7 +31,7 @@ let modZxing: ModZxing | null | undefined;
  * Carga DIFERIDA del módulo zxing (doc hermano §1: `import("zxing-wasm/
  * reader")` + wasm servido LOCAL desde public/wasm/ vía
  * setZXingModuleOverrides({ locateFile }) con base
- * `${NEXT_PUBLIC_BASE_PATH ?? ""}/wasm/`). Una sola tentativa por sesión
+ * `${publicBaseEfectivo()}/wasm/`). Una sola tentativa por sesión
  * (caché); falla → null CON traza de indisponibilidad (T-0.1 del e64 —
  * doc hermano F-0.2) y el pipeline degrada a solo-jsQR. Jamás throw.
  *

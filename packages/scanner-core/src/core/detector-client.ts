@@ -19,6 +19,11 @@
  */
 
 import type { Quad } from "./types";
+// R-46 — el worker vendido (self-host) se sirve con el publicBase INYECTADO
+// del paquete (dominio/entorno.ts): lazy al construir el Worker, jamás const
+// module-level que congele el env al importar (default idéntico: cuando nadie
+// configura, urlAssetPublico cae al mismo env que leía la const).
+import { urlAssetPublico } from "../dominio/entorno";
 
 // ─── Modos y perfiles (core/types.ts del usuario) ───────────────────────────
 
@@ -161,13 +166,15 @@ interface PendingEntry {
   reject: (err: Error) => void;
 }
 
-// GitHub Pages sirve la app bajo /web-scanner/ → el worker se referencia con
-// el prefijo público del build (vacío en dev/servidor local). OpenCV dentro
-// del worker ya se resuelve con rutas RELATIVAS al script → funciona igual.
-const PUBLIC_BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+// GitHub Pages sirve la app bajo /web-scanner/ → el worker vendido (self-host)
+// se referencia con el prefijo público del build (vacío en dev/servidor local).
+// OpenCV dentro del worker ya se resuelve con rutas RELATIVAS al script →
+// funciona igual. R-46: el prefijo entra por INYECCIÓN (urlAssetPublico) y se
+// resuelve LAZY en spawn() — la const module-level congelaba el env al importar.
 // Bump obligatorio cada vez que cambie public/scanner/detection-worker.js
 // (el SW lo cachea stale-while-revalidate — auditoría A-15).
-const WORKER_URL = `${PUBLIC_BASE}/scanner/detection-worker.js?v=8`;
+const WORKER_URL = (): string =>
+  `${urlAssetPublico("/scanner/detection-worker.js")}?v=8`;
 const READY_TIMEOUT_MS = 25000;
 
 export class ScannerWorkerClient {
@@ -237,7 +244,7 @@ export class ScannerWorkerClient {
       // KIT e14-remediacion-movil-v1 (C4): `name` explícito — los targets
       // mudos (worker girando al 105 % CPU) pasan a ser nombrables en
       // devtools/ps. El tipo de worker NO cambia (IIFE clásico).
-      this.worker = new Worker(WORKER_URL, { name: "detection-precision-v1" });
+      this.worker = new Worker(WORKER_URL(), { name: "detection-precision-v1" }); // R-46 — URL lazy (inyección vigente)
     } catch {
       // Worker irreparable de construir (URL/CSP): queda dead y ready=false — el pipeline cae a su detector Sobel/canvas de respaldo.
       this.dead = true;

@@ -7,8 +7,9 @@
  * (§1.2: jerarquía por código, nombres una sola vez — 0,63 MB) a partir del
  * `departmentsTree.json` que la Registraduría publica para su visor ciudadano
  * (§1). Carga (§1.3): fetch de `/e14/divipol.json` (asset estático de
- * `public/`, servido junto a la app — con prefijo NEXT_PUBLIC_BASE_PATH bajo
- * /web-scanner/, mismo patrón que detector-client/ocr del core) + caché en
+ * `public/`, servido junto a la app — con el prefijo público INYECTADO del
+ * paquete (dominio/entorno.ts — configurarPublicBase/publicBaseEfectivo, R-46)
+ * bajo /web-scanner/, mismo patrón que detector-client/ocr del core) + caché en
  * memoria + estado `cargando/cargada/falló` (aviso si falla; sin base la app
  * degrada a MANUAL puro, NUNCA a RECHAZADA).
  *

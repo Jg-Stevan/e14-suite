@@ -56,6 +56,10 @@
  * `localStorage.setItem`, jamás blob/File/dataURL/contenido de actas.
  */
 import { appendEvento } from "@jg-stevan/scanner-core/obs-base/buffer";
+// R-46 — Base pública de assets desde la FUENTE ÚNICA de la app
+// (src/shared/env.ts, era const local con env crudo): el worker precompilado
+// se sirve desde public/ — mismo patrón del repo (flags.ts · sondeo-qr.client.ts).
+import { PUBLIC_BASE } from "@/shared/env";
 import { appVersion, idDispositivo, idSesion } from "./identidad";
 import { leerFlags } from "../flags";
 import {
@@ -85,11 +89,6 @@ type MensajeHeartbeat =
  *  sondeo-qr.client.ts:218). En producción es la única referencia
  *  `new Worker` de este módulo. */
 type FabricaWorkerHeartbeat = () => WorkerHeartbeat | null;
-
-/** Base pública de assets — MISMO patrón del repo (flags.ts /
- *  sondeo-qr.client.ts): el worker precompilado se sirve desde public/.
- */
-const PUBLIC_BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 function fabricaProduccion(): WorkerHeartbeat | null {
   // KIT e14-remediacion-movil-v1 (C4): `name` explícito — el sensor de hang

@@ -8,6 +8,11 @@
  *  · LibraryView         → OCR por lotes sobre la selección múltiple.
  */
 
+// R-46 — los assets vendorizados se sirven con el publicBase INYECTADO del
+// paquete (dominio/entorno.ts): lazy en el punto de uso, jamás const module-
+// level (congelar el env AL IMPORTAR impedía que la app lo configurara).
+import { publicBaseEfectivo, urlAssetPublico } from "../dominio/entorno";
+
 /** Respuesta del modelo cuando la imagen no contiene texto legible. */
 export const OCR_NO_TEXT = "(sin texto legible)";
 
@@ -28,12 +33,17 @@ const MAX_OCR_PAYLOAD = 10 * 1024 * 1024;
  * oficiales — detalle y hashes en docs/lab/fix-loteD-decisiones-v1.md. */
 
 /** UMD de tesseract.js v5.1.1 self-host (API estable
- *  createWorker/recognize/terminate). Lote D (D-4): prefijo PUBLIC_BASE
- *  (mismo patrón que detector-client.ts WORKER_URL — el deploy de Pages
- *  vive bajo basePath /web-scanner/lab; en dev/servidor local queda
- *  vacío). */
-const PUBLIC_BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-const TESSERACT_SRC = `${PUBLIC_BASE}/vendor/ocr/tesseract.min.js`;
+ *  createWorker/recognize/terminate). Lote D (D-4): prefijo público del
+ *  build (mismo patrón que detector-client.ts WORKER_URL — el deploy de
+ *  Pages vive bajo basePath /web-scanner/lab; en dev/servidor local queda
+ *  vacío). R-46: el prefijo entra por INYECCIÓN (dominio/entorno.ts —
+ *  urlAssetPublico) y se resuelve LAZY en el punto de uso; la const
+ *  module-level congelaba el env al importar y la app no podía configurar
+ *  su publicBase después (default idéntico: publicBaseEfectivo() cae al
+ *  mismo env cuando nadie configura). */
+function tesseractSrc(): string {
+  return urlAssetPublico("/vendor/ocr/tesseract.min.js");
+}
 
 /** Lado máximo de la imagen que va al OCR local (rendimiento en móvil). */
 const OCR_LOCAL_MAX_SIDE = 1600;
@@ -80,7 +90,7 @@ function loadTesseract(): Promise<TesseractGlobal> {
       return;
     }
     const el = document.createElement("script");
-    el.src = TESSERACT_SRC;
+    el.src = tesseractSrc(); // R-46 — resuelto EN LA LLAMADA (inyección vigente)
     el.async = true;
     el.onload = () => {
       if (w.Tesseract) resolve(w.Tesseract);
@@ -138,14 +148,14 @@ function getOcrWorker(): Promise<TesseractWorker> {
     const Tesseract = await loadTesseract();
     return await Tesseract.createWorker("spa+eng", 1, {
       // Lote D (D-4, F-OCR-LOCAL): motor self-host — sin CDN. Rutas
-      // mismas-origen CON prefijo PUBLIC_BASE (basePath de Pages — ver
-      // comentario de TESSERACT_SRC). corePath = DIRECTORIO: el worker
+      // mismas-origen CON el prefijo público INYECTADO (urlAssetPublico —
+      // ver comentario de tesseractSrc). corePath = DIRECTORIO: el worker
       // v5.1.1 añade la variante según SIMD+OEM (aquí oem=1 → LSTM →
       // tesseract-core[-simd]-lstm.wasm.js — ambos vendorizados). langPath
       // espera {langPath}/{lang}.traineddata.gz — spa/eng en /lang/.
-      workerPath: `${PUBLIC_BASE}/vendor/ocr/worker.min.js`,
-      corePath: `${PUBLIC_BASE}/vendor/ocr`,
-      langPath: `${PUBLIC_BASE}/vendor/ocr/lang`,
+      workerPath: urlAssetPublico("/vendor/ocr/worker.min.js"), // R-46 — lazy
+      corePath: urlAssetPublico("/vendor/ocr"),
+      langPath: urlAssetPublico("/vendor/ocr/lang"),
       logger: (m) => {
         if (ocrProgressHandler && m?.status === "recognizing text" && typeof m.progress === "number") {
           ocrProgressHandler(m.progress);
@@ -206,7 +216,7 @@ async function requestOcrServer(image: string): Promise<string> {
   if (process.env.NEXT_PUBLIC_STATIC === "1") {
     throw new Error("despliegue estático: OCR local");
   }
-  const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  const base = publicBaseEfectivo(); // R-46 — inyección en el punto de uso (era env crudo)
   const res = await fetch(`${base}/api/ocr`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

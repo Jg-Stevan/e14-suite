@@ -13,13 +13,15 @@
  * nueva versión E-04).
  */
 
+// R-46 — fuente única de la app (src/shared/env.ts): era env crudo inline.
+import { PUBLIC_BASE } from "@/shared/env";
+
 /** Registra el Service Worker (producción: https/distinto de localhost). */
 export function registerServiceWorker(): void {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
   if (window.location.protocol !== "https:") return; // el deploy (Cloudflare Pages) es https; localhost dev se salta
-  const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   const register = () => {
-    navigator.serviceWorker.register(`${base}/sw.js`).catch(() => {
+    navigator.serviceWorker.register(`${PUBLIC_BASE}/sw.js`).catch(() => {
       /* sin SW la app funciona igual (solo pierde el offline) */
     });
   };

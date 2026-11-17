@@ -4,7 +4,7 @@
     "commit": "feba267cb9c01a896f0135ed2e406b7567bec663",
     "version": "0.4.1"
   },
-  "nota": "Paquete unico @jg-stevan/scanner-core (mapa v2.3): sustituye a las copias vendorizadas de digielect14 y supervision-e14. Los 6 modulos compartidos entran TAL CUAL (md5 verificado en ambos clones); los 6 D-only del CONTRATO de digielect14 se quedan en esa app (sin contraparte en S).",
+  "nota": "Paquete unico @jg-stevan/scanner-core (mapa v2.3): sustituye a las copias vendorizadas de digielect14 y supervision-e14. Los 6 modulos compartidos entran TAL CUAL (md5 verificado en ambos clones); los 6 D-only del CONTRATO de digielect14 se quedan en esa app (sin contraparte en S). Desviaciones DECLARADAS (md5 regenerado con el cambio documentado): image-processor.ts (FASE 1 §3.3 — publicBase inyectado vía dominio/entorno.ts) y detector-client.ts + ocr.ts (R-46 — mismo motivo: urlAssetPublico/publicBaseEfectivo lazy en el punto de uso; sin configurar, byte-comportamiento idéntico al vendor).",
   "compartidos": [
     "codec.ts",
     "detector-client.ts",
@@ -15,10 +15,10 @@
   ],
   "modulos": {
     "codec.ts": "da9e19e1b887dd254580a5daa27f3d47",
-    "detector-client.ts": "4ab6106e15c8433d905facd21c154f3b",
+    "detector-client.ts": "dd2394d8d9c075ce7c5447f763a8a0a2",
     "image-modes.ts": "0b8881cb025bd5adbde1a7421f5c1954",
     "image-processor.ts": "44ebd70b469ae5f369e00d387c02ad40",
-    "ocr.ts": "deb8e20e745d99c2652582572f927dda",
+    "ocr.ts": "b6caf82badde1717ac935bf6675ad101",
     "types.ts": "54943986fffac5e0b58dc586ebf89a9d"
   }
 }
