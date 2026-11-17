@@ -164,7 +164,12 @@ describe("nativo — token efímero del sidecar (H-44, TRAY-C-07)", () => {
     expect(salida?.texto).toBe("x");
     expect(llamadas[0]).toBe("http://127.0.0.1:8765/ocr");
     expect(cabeceras[0]?.["x-sidecar-token"]).toBe("deadbeefcafe0123");
-    expect(cabeceras[0]?.["content-type"]).toBe("application/json");
+    // R-56 (2026-11-19): modo binario preferente — el cuerpo va como Blob
+    // (image/<mime del dataURL>) para no duplicar la imagen en RAM; el JSON
+    // queda SOLO como fallback para entornos sin Blob. El token viaja igual
+    // en ambos modos y el cap viaja por header en el binario.
+    expect(cabeceras[0]?.["content-type"]).toBe("image/jpeg");
+    expect(cabeceras[0]?.["x-imagen-cap"]).toBe("1280");
   });
 
   test("POST /acta manda el MISMO header", async () => {

@@ -140,6 +140,56 @@ async function conTimeout<T>(hacer: (signal: AbortSignal) => Promise<T>, ms: num
   }
 }
 
+// ─── R-56 — transporte de la imagen hacia el sidecar (binario con fallback JSON) ───
+
+/** R-56 — mime del dataURL con validación estricta (solo `image/*`: jamás se
+ *  fabrica una cabecera desde el string crudo). null = prefijo no parseable —
+ *  el caller cae a image/jpeg o al camino JSON, según corresponda. */
+function mimeDeDataUrl(dataUrl: string): string | null {
+  const m = /^data:(image\/[a-z0-9.+-]+);base64,/.exec(dataUrl.slice(0, 128));
+  return m ? m[1] : null;
+}
+
+/** R-56 — opciones de fetch con el cuerpo de la imagen para /ocr y /acta.
+ *  CAMINO BINARIO (preferente): los dataURL JSON duplicaban la foto en RAM
+ *  (base64 = +33 % sobre los bytes ya presentes en memoria). Aquí se decodifica
+ *  el dataURL a bytes (atob → Uint8Array → Blob) y se envía el Blob con
+ *  `content-type: image/*` real del dataURL; el `cap` viaja por el header
+ *  `x-imagen-cap` (el sidecar lo lee — contrato v1 ampliado en servidor.py,
+ *  compatible con clientes viejos que siguen mandando JSON).
+ *  FALLBACK: sin Blob/atob (entornos viejos) o CUALQUIER fallo de
+ *  construcción → null y el caller usa el JSON de siempre (doctrina: jamás
+ *  lanza; el sidecar es aceleración). El CONTRATO DE RESPUESTA no cambia: el
+ *  servidor responde exactamente lo mismo en ambos modos. */
+interface CuerpoImagen {
+  headers: Record<string, string>;
+  body: BodyInit;
+}
+
+function cuerpoDeImagen(dataUrl: string, cap: number, token: string | null): CuerpoImagen | null {
+  if (typeof Blob !== "function" || typeof atob !== "function") return null;
+  try {
+    const coma = dataUrl.indexOf(",");
+    if (coma < 0) return null;
+    const mime = mimeDeDataUrl(dataUrl) ?? "image/jpeg";
+    const bin = atob(dataUrl.slice(coma + 1));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+    const headers: Record<string, string> = {
+      "content-type": mime,
+      // R-56 — el cap viaja en cabecera porque el cuerpo ya no es JSON.
+      "x-imagen-cap": String(cap),
+    };
+    // H-44 — el token efímero viaja igual en ambos modos (sin él el sidecar
+    // responde 401 y el caller cae al WASM).
+    if (token) headers["x-sidecar-token"] = token;
+    return { headers, body: new Blob([bytes], { type: mime }) };
+  } catch {
+    // dataURL podrido / Blob fallando: null → el caller manda el JSON de siempre (la sonda /salud y el 401 no cambian).
+    return null;
+  }
+}
+
 /** ¿El lado nativo está disponible? cachea el veredicto SALUD_TTL_MS.
  *  `timeoutMs` se amplía cuando la sonda la dispara un click: el prompt de
  *  Local Network Access de Chrome puede tardar más que el timeout corto. */
@@ -216,17 +266,20 @@ export async function ocrNativo(dataUrl: string, cap: number): Promise<OcrNativo
   const url = urlBase();
   if (!url) return null;
   try {
+    // R-56 — cuerpo BINARIO cuando hay Blob (la foto no se duplica en RAM);
+    // cualquier fallo → camino JSON idéntico al de siempre (jamás lanza).
+    const binario = cuerpoDeImagen(dataUrl, cap, tokenNativo);
     const res = await conTimeout(
       (signal) =>
         fetch(`${url}/ocr`, {
           method: "POST",
-          headers: {
+          headers: binario?.headers ?? {
             "content-type": "application/json",
             // H-44 — el token efímero del arranque; sin él el sidecar responde
             // 401 y esta llamada devuelve null (caída al WASM de siempre).
             ...(tokenNativo ? { "x-sidecar-token": tokenNativo } : {}),
           },
-          body: JSON.stringify({ imagen: dataUrl, cap }),
+          body: binario?.body ?? JSON.stringify({ imagen: dataUrl, cap }),
           signal,
           ...OPCIONES_LOOPBACK,
         }),
@@ -301,16 +354,19 @@ export async function actaNativa(dataUrl: string, cap = 1280): Promise<ActaNativ
   const url = urlBase();
   if (!url) return null;
   try {
+    // R-56 — mismo transporte binario con fallback JSON que /ocr (ver
+    // cuerpoDeImagen): una sola copia de los bytes, respuesta idéntica.
+    const binario = cuerpoDeImagen(dataUrl, cap, tokenNativo);
     const res = await conTimeout(
       (signal) =>
         fetch(`${url}/acta`, {
           method: "POST",
-          headers: {
+          headers: binario?.headers ?? {
             "content-type": "application/json",
             // H-44 — mismo token efímero que /ocr (ver ocrNativo).
             ...(tokenNativo ? { "x-sidecar-token": tokenNativo } : {}),
           },
-          body: JSON.stringify({ imagen: dataUrl, cap }),
+          body: binario?.body ?? JSON.stringify({ imagen: dataUrl, cap }),
           signal,
           ...OPCIONES_LOOPBACK,
         }),

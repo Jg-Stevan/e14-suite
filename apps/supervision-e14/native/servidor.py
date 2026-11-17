@@ -6,12 +6,22 @@ lo más caro del pipeline (el OCR en WASM y, en modo acta-completa, también el
 warp, la b/n y el sondeo de orientación):
 
   GET  /salud  → {"ok":true,"motor":"v5","version":VERSION}
-  POST /ocr    → {"imagen":"data:image/jpeg;base64,...","cap":1280}
+  POST /ocr    → JSON     : {"imagen":"data:image/jpeg;base64,...","cap":1280}
+                 BINARIO  : cuerpo = BYTES de la imagen, `Content-Type: image/*`
+                 y `cap` en el header `X-Imagen-Cap` (default 1280) — R-56:
+                 evita duplicar la foto en RAM como base64 (+33 %).
               ← {"texto","conf","detMs","recMs","clsMs","nBoxes","nLineas"}
-  POST /acta   → {"imagen":<dataURL de la foto ORIGINAL>, "cap":1280}
+  POST /acta   → los DOS mismos modos (el binario manda la foto ORIGINAL)
               ← {"procesada":<dataURL b/n>, "texto","conf","detMs","recMs",
                  "quad":[[x,y]×4 normalizados], "quadOrigen","rot","qr",
                  "ancho","alto","nBoxes","nLineas","etapas","totalMs"}
+
+Ambos modos responden EXACTAMENTE lo mismo (mismo JSON, mismos códigos de
+error): el modo binario es una OPTIMIZACIÓN de transporte, no un cambio de
+contrato. El camino JSON queda intacto — compatibilidad total con clientes
+viejos. (Nota de versión: VERSION es el id del KIT (e14-ocr-nativo-v1), no
+semver — no hay constante de versión semántica que subir; el contrato v1 se
+AMPLÍA hacia atrás, jamás se rompe.)
 
 H-44 (TRAY-C-07): /ocr y /acta exigen el TOKEN efímero que el arranque
 imprime junto al puerto (header `x-sidecar-token` o `?token=` en la URL);
@@ -291,7 +301,9 @@ class Manejador(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", origen or "null")
         self.send_header("Vary", "Origin")
         self.send_header("Cross-Origin-Resource-Policy", "cross-origin")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, x-sidecar-token")
+        # R-56 — `x-imagen-cap` entra a la allowlist del preflight: el modo
+        # binario manda el `cap` por cabecera (el cuerpo ya no es JSON).
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, x-sidecar-token, x-imagen-cap")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         # Private Network Access: cuando una página PÚBLICA (https://*.pages.dev)
         # pide algo a 127.0.0.1 el navegador manda un preflight con
@@ -326,6 +338,22 @@ class Manejador(BaseHTTPRequestHandler):
             raise ValueError("tamano")
         return json.loads(self.rfile.read(n).decode("utf-8"))
 
+    def _cuerpo_binario(self):
+        """R-56 — cuerpo BINARIO (Content-Type image/* u octet-stream) → el
+        MISMO dataURL que siempre reconstruyen los handlers internos
+        (`_decodifica`). Lee exactamente Content-Length bytes (HTTP/1.1 con
+        keep-alive: un byte de más/des corrompería la siguiente petición).
+        El mime lo declara el cliente en Content-Type (default image/jpeg) —
+        cv2.imdecode husmea los bytes, el mime solo viaja dentro del dataURL."""
+        n = int(self.headers.get("Content-Length") or 0)
+        if n <= 0 or n > MAX_BYTES:
+            raise ValueError("tamano")
+        crudo = self.rfile.read(n)
+        mime = (self.headers.get("Content-Type") or "image/jpeg").split(";")[0].strip()
+        if not mime:
+            mime = "image/jpeg"
+        return "data:%s;base64,%s" % (mime, base64.b64encode(crudo).decode("ascii"))
+
     def do_POST(self):  # noqa: N802
         ruta = self.path.split("?")[0]
         if not (ruta.startswith("/ocr") or ruta.startswith("/acta")):
@@ -351,13 +379,24 @@ class Manejador(BaseHTTPRequestHandler):
                            "x-sidecar-token o como ?token= en la URL",
             })
         try:
-            cuerpo = self._cuerpo()
-            cap = int(cuerpo.get("cap", 1280))
+            # R-56 — DOS modos de entrada, MISMA salida: si el Content-Type es
+            # de imagen (u octet-stream), el cuerpo son los BYTES crudos y el
+            # `cap` viaja en `X-Imagen-Cap` (default 1280); si no, el JSON de
+            # siempre (compatibilidad total con clientes viejos). Los handlers
+            # internos y los códigos de error NO cambian.
+            tipo = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            if tipo.startswith("image/") or tipo == "application/octet-stream":
+                imagen = self._cuerpo_binario()
+                cap = int(self.headers.get("X-Imagen-Cap") or 1280)
+            else:
+                cuerpo = self._cuerpo()
+                imagen = cuerpo["imagen"]
+                cap = int(cuerpo.get("cap", 1280))
             t0 = time.perf_counter()
             if ruta.startswith("/acta"):
-                salida = self.motor.acta_desde_dataurl(cuerpo["imagen"], cap)
+                salida = self.motor.acta_desde_dataurl(imagen, cap)
             else:
-                salida = self.motor.ocr_desde_dataurl(cuerpo["imagen"], cap)
+                salida = self.motor.ocr_desde_dataurl(imagen, cap)
             salida["totalMs"] = round((time.perf_counter() - t0) * 1000)
             self._json(200, salida)
         except Exception as err:  # nunca un 500 sin cuerpo: la app cae a WASM
