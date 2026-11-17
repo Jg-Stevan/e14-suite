@@ -23,6 +23,7 @@
  * persistente (píldoras, banner, píldora flotante, feedback en botón).
  */
 import { useEffect, useMemo, useState } from "react";
+import type { Acta } from "@/lib/e14/fachada";
 import { useE14Store } from "@/lib/e14/store";
 import { defaultQuad } from "@/lib/e14/fachada";
 // G4 (KIT camara-visor-v1): descarga de la foto PROCESADA. downloadBlob y
@@ -55,6 +56,41 @@ import {
 async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
   const res = await fetch(dataUrl);
   return res.blob();
+}
+
+// KIT aviso-calidad-real-v1 — el motivo del banner ADVERTENCIA se deriva de
+// las MISMAS señales que fijaron el score (diagnóstico: escudo de fondo,
+// level y métricas v2), no del mínimo de las 3 métricas CRUDAS: esa
+// comparación etiquetaba «LUMINOSIDAD» toda acta cuyo brillo era el menor
+// (p. ej. sharpness 100 / brightness 68 / contrast 83) aunque el techo lo
+// hubiera puesto el escudo de fondo o la nitidez hi-res (sharpnessHi). Sin
+// diagnóstico (SIM / actas previas) se conserva el heurístico histórico.
+// Se muestra el número REAL de la señal culpable (operador accionable).
+function razonDeAdvertencia(acta: Acta): string | null {
+  const d = acta.diagnostico;
+  if (!d) {
+    const m = acta.metricas;
+    if (!m) return null;
+    return m.sharpness <= m.contrast && m.sharpness <= m.brightness
+      ? "LEVE DESFOQUE"
+      : m.contrast <= m.brightness
+        ? "CONTRASTE"
+        : "LUMINOSIDAD";
+  }
+  // El escudo anti-fondo D10 capa a 7.9 sin importar las métricas: el
+  // defecto es el BORDE (sombra/fondo en el warp), no la luz del acta.
+  if (d.gate.fondo) return "FONDO CON SOMBRA";
+  // MISMO fallback que la fórmula del score (calidad.ts): sharpnessHi=0
+  // significa «señal hi-res no medida» → manda la nitidez del core.
+  const nitidez = d.metricas.sharpnessHi || d.metricas.sharpness;
+  const peor = [
+    { texto: "LEVE DESFOQUE", valor: nitidez },
+    { texto: "LUZ BAJA", valor: d.metricas.brightness },
+    { texto: "CONTRASTE BAJO", valor: d.metricas.contrasteEfectivo },
+  ].sort((a, b) => a.valor - b.valor)[0];
+  return peor.valor < 70
+    ? `${peor.texto} · ${Math.round(peor.valor)}/100`
+    : "REVISAR CALIDAD";
 }
 
 export function ReviewView() {
@@ -268,16 +304,8 @@ export function ReviewView() {
           tono: "warn" as const,
         };
       if (mesaParcial != null) return { texto: "LECTURA PARCIAL", tono: "warn" as const };
-      const m = acta.metricas;
-      if (m) {
-        const razon =
-          m.sharpness <= m.contrast && m.sharpness <= m.brightness
-            ? "LEVE DESFOQUE"
-            : m.contrast <= m.brightness
-              ? "CONTRASTE"
-              : "LUMINOSIDAD";
-        return { texto: razon, tono: "warn" as const };
-      }
+      const razon = razonDeAdvertencia(acta);
+      if (razon) return { texto: razon, tono: "warn" as const };
       return null;
     }
     // Fix del mantenedor (14-oct) #2: píldora verde para ÓPTIMA/ENVIADA.

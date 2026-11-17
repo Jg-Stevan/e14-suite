@@ -22,7 +22,7 @@
  */
 import { createElement } from "react";
 import { describe, it, vi } from "vitest";
-import type { Acta } from "@jg-stevan/scanner-core/dominio/types";
+import type { Acta, DiagnosticoActa } from "@jg-stevan/scanner-core/dominio/types";
 import type { Quad } from "@jg-stevan/scanner-core/core/types";
 
 // ── Mocks de módulos pesados (han de declararse antes del import dinámico) ──
@@ -76,6 +76,51 @@ function actaBase(ajustes: Partial<Acta>): Acta {
     ts: Date.parse("2026-11-07T12:00:00Z"),
     ...ajustes,
   } as Acta;
+}
+
+/** Diagnóstico SINTÉTICO (mismo contrato que el pipeline persiste) — KIT
+ *  aviso-calidad-real-v1: el banner ADVERTENCIA lee de aquí las señales que
+ *  fijaron el score (level, métricas v2, escudo de fondo). */
+function diagBase(ajustes: Partial<DiagnosticoActa>): DiagnosticoActa {
+  return {
+    ts: "2026-11-16T16:36:08.525Z",
+    actaId: "acta-test",
+    intento: 1,
+    maxIntentos: 4,
+    status: "ADVERTENCIA",
+    rechazo: null,
+    score: { visual: 8.6, final: 7.9, techos: ["techo-fair:7.9"] },
+    metricas: {
+      sharpness: 100,
+      brightness: 68,
+      contrast: 83,
+      sharpnessHi: 55,
+      contrastPapel: 90,
+      contrasteEfectivo: 83,
+    },
+    level: "fair",
+    lectura: { nivel: "MEDIA", anclas: 6, chars: 900 },
+    senalActa: true,
+    ocrValido: true,
+    gate: {
+      completa: true,
+      fondo: false,
+      recortada: false,
+      ladoEsquina: null,
+      votos: { densidadPct: 5, skipPag2: true, ok: true },
+      procesadaVacia: false,
+      clasifNivel: "AUTO",
+    },
+    captura: {
+      motor: "canvas",
+      filtro: "bw",
+      crop: { w: 100, h: 140, fallback: false },
+      quad: QUAD,
+      quadOrigen: "worker",
+    },
+    tiempos: { procesoMs: 1000, calidadMs: 100, ocrMs: 2000, totalMs: 3000 },
+    ...ajustes,
+  };
 }
 
 describe("7.10 · ReviewView — copy visible por estado (Q-52 — activado: alias @ y deps)", () => {
@@ -170,6 +215,129 @@ describe("7.10 · ReviewView — copy visible por estado (Q-52 — activado: ali
     };
     const html = renderToStaticMarkup(createElement(ReviewView));
     if (!html.includes("ACTA RECORTADA · BL")) throw new Error("falta ACTA RECORTADA · BL");
+  });
+
+  it("ADVERTENCIA por level fair: el motivo usa la señal v2 culpable, no el mínimo crudo (KIT aviso-calidad-real-v1)", async () => {
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { ReviewView } = await import("@/components/e14/screens/ReviewView");
+    estadoStore = {
+      // Crudas 100/68/83 → el heurístico viejo decía «LUMINOSIDAD» solo
+      // porque 68 era el menor. La nitidez HI-RES (55) es la que hundió el
+      // level a fair: el motivo correcto es el desfoque real.
+      actaActual: actaBase({
+        status: "ADVERTENCIA",
+        score: 7.9,
+        diagnostico: diagBase({}),
+      }),
+      recortando: false,
+      revelando: false,
+      errorRecorte: null,
+      aplicarRecorte: vi.fn(),
+      rotarFoto: vi.fn(),
+      cambiarFiltro: vi.fn(),
+      reconocerTextoActa: vi.fn(),
+    };
+    const html = renderToStaticMarkup(createElement(ReviewView));
+    if (!html.includes("LEVE DESFOQUE · 55/100"))
+      throw new Error("falta el motivo real (nitidez hi-res) con su valor");
+    if (html.includes("LUMINOSIDAD")) throw new Error("el mínimo crudo NO debe etiquetar el motivo");
+  });
+
+  it("ADVERTENCIA sin señal dominante (todas las métricas ≥70): no inventa un motivo", async () => {
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { ReviewView } = await import("@/components/e14/screens/ReviewView");
+    estadoStore = {
+      actaActual: actaBase({
+        status: "ADVERTENCIA",
+        score: 7.7,
+        diagnostico: diagBase({
+          level: "good",
+          score: { visual: 7.7, final: 7.7, techos: [] },
+          metricas: {
+            sharpness: 85,
+            brightness: 75,
+            contrast: 78,
+            sharpnessHi: 85,
+            contrastPapel: 80,
+            contrasteEfectivo: 80,
+          },
+        }),
+      }),
+      recortando: false,
+      revelando: false,
+      errorRecorte: null,
+      aplicarRecorte: vi.fn(),
+      rotarFoto: vi.fn(),
+      cambiarFiltro: vi.fn(),
+      reconocerTextoActa: vi.fn(),
+    };
+    const html = renderToStaticMarkup(createElement(ReviewView));
+    if (!html.includes("REVISAR CALIDAD")) throw new Error("falta REVISAR CALIDAD");
+    if (html.includes("LUMINOSIDAD")) throw new Error("nada es «luminosidad» si el mínimo es 75");
+  });
+
+  it("ADVERTENCIA por escudo de fondo: el motivo es el borde, no las métricas (D10)", async () => {
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { ReviewView } = await import("@/components/e14/screens/ReviewView");
+    estadoStore = {
+      actaActual: actaBase({
+        status: "ADVERTENCIA",
+        score: 7.9,
+        diagnostico: diagBase({
+          level: "good",
+          score: { visual: 8.8, final: 7.9, techos: ["escudo-fondo:7.9"] },
+          metricas: {
+            sharpness: 100,
+            brightness: 68,
+            contrast: 83,
+            sharpnessHi: 100,
+            contrastPapel: 90,
+            contrasteEfectivo: 83,
+          },
+          gate: {
+            completa: true,
+            fondo: true,
+            recortada: false,
+            ladoEsquina: null,
+            votos: { densidadPct: 5, skipPag2: true, ok: true },
+            procesadaVacia: false,
+            clasifNivel: "AUTO",
+          },
+        }),
+      }),
+      recortando: false,
+      revelando: false,
+      errorRecorte: null,
+      aplicarRecorte: vi.fn(),
+      rotarFoto: vi.fn(),
+      cambiarFiltro: vi.fn(),
+      reconocerTextoActa: vi.fn(),
+    };
+    const html = renderToStaticMarkup(createElement(ReviewView));
+    if (!html.includes("FONDO CON SOMBRA")) throw new Error("falta FONDO CON SOMBRA");
+    if (html.includes("LUMINOSIDAD")) throw new Error("el fondo no es un problema de luz");
+  });
+
+  it("ADVERTENCIA sin diagnóstico (SIM/actas previas): conserva el heurístico histórico", async () => {
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { ReviewView } = await import("@/components/e14/screens/ReviewView");
+    estadoStore = {
+      actaActual: actaBase({
+        status: "ADVERTENCIA",
+        score: 7.5,
+        // 80/95/22 → el contraste crudo es el mínimo (heurístico de siempre).
+        metricas: { sharpness: 80, brightness: 95, contrast: 22 },
+      }),
+      recortando: false,
+      revelando: false,
+      errorRecorte: null,
+      aplicarRecorte: vi.fn(),
+      rotarFoto: vi.fn(),
+      cambiarFiltro: vi.fn(),
+      reconocerTextoActa: vi.fn(),
+    };
+    const html = renderToStaticMarkup(createElement(ReviewView));
+    if (!html.includes("CONTRASTE")) throw new Error("falta el fallback CONTRASTE");
   });
 
   it("ÓPTIMA: píldora con score y bruto + bloque de auto-envío", async () => {
