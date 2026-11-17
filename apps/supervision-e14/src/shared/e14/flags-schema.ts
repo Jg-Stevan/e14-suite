@@ -155,7 +155,7 @@ export const ESQUEMA_FLAGS: readonly DescriptorFlag[] = [
   // sentido con `ocrNativoUrl` vivo; sin sidecar el pipeline JS corre igual.
   { clave: "actaNativa", sanea: booleano },
   // Auditoría 2026-11-11 (#3) — lote DEMO. D98-sup: kill-switch del botón
-  // DEMO ×4 (default true en FLAGS_DEFAULT; false lo esconde).
+  // DEMO ×7 (default true en FLAGS_DEFAULT; false lo esconde).
   { clave: "loteDemoLocal", sanea: booleano },
   // Auditoría 2026-11-11 (#4) — ancla DEMO del panel de supervisión.
   { clave: "anclaDemoSupervision", sanea: booleano },

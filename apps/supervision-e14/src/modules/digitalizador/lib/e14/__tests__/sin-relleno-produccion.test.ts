@@ -156,7 +156,7 @@ const MENCIONES_PERMITIDAS_ACTA_MOCK = new Map<string, string>([
 const PRODUCTORES_DEMO: ReadonlyArray<[string, string]> = [
   [
     "src/modules/digitalizador/lib/e14/actas-demo.ts",
-    "lote DEMO ×4 de la bandeja (fetchActasDemo → fixtures acta-sim-*)",
+    "lote DEMO ×7 de la bandeja (fetchActasDemo → galería simulada sim-*)",
   ],
   [
     "src/modules/digitalizador/lib/e14/sim-assets.ts",
@@ -189,7 +189,7 @@ const PRODUCTORES_DEMO: ReadonlyArray<[string, string]> = [
 const MENCIONES_PERMITIDAS_FIXTURES = new Map<string, string>([
   [
     "src/modules/digitalizador/lib/e14/actas-demo.ts",
-    "productor del lote DEMO ×4 (imports de las fixtures)",
+    "productor del lote DEMO ×7 (imports de la galería simulada)",
   ],
   [
     "src/modules/digitalizador/lib/e14/sim-assets.ts",

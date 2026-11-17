@@ -16,9 +16,9 @@ import {
   type EstadoRecepcion,
 } from "../data/recepcion-log";
 import { tiempoRelativo } from "./tiempo";
-// D-32/D-33 (plan 2026-11-12) — LOTE DE PRUEBA y REINICIAR DEMO: las 4
-// fixtures sintéticas entran por la COLA MASIVA y las procesa el MOTOR REAL
-// (mismo pipeline del lote ×4). El desenlace publicado —status, score y foto
+// D-32/D-33 (plan 2026-11-12) — LOTE DE PRUEBA y REINICIAR DEMO: las 7
+// muestras sintéticas entran por la COLA MASIVA y las procesa el MOTOR REAL
+// (mismo pipeline del lote ×7). El desenlace publicado —status, score y foto
 // PROCESADA— es el del motor, nunca telemetría anclada; el origen "demo"
 // solo sostiene el chip DEMO (D89-sup) y el alcance de «Reiniciar demo».
 import { reiniciarDemoPanel } from "../data/actas-runtime";
@@ -533,7 +533,7 @@ export function VistaRecepcion({
   const montadoRef = useRef(false);
 
   // ─── D-32 (plan 2026-11-12) — LOTE DE PRUEBA (motor real) ───────────────
-  // Encola las 4 fixtures SINTÉTICAS en la cola masiva y deja que el MOTOR
+  // Encola las 7 muestras SINTÉTICAS en la cola masiva y deja que el MOTOR
   // las procese (decode → warp → completitud → gate → clasificación). Cada
   // fila LISTA se publica con su resultado REAL (status/score/foto
   // PROCESADA) por el embudo de siempre, con origen "demo" — el visor
@@ -920,16 +920,16 @@ export function VistaRecepcion({
                 : "Pausado"
               : "Feed: transmitiendo"}
           </span>
-          {/* D-32 — LOTE DE PRUEBA: las 4 fixtures las procesa el motor real. */}
+          {/* D-32 — LOTE DE PRUEBA: las 7 muestras las procesa el motor real. */}
           <Button
             variant="outline"
             size="sm"
             className="label-caps h-11 border-(--amber) text-(--amber) hover:bg-(--amber)/10"
             onClick={() => void simularRecepcion()}
             disabled={simulando}
-            title="Procesa las 4 actas sintéticas con el MOTOR real (misma cola masiva) y publica el resultado real — sin depender del teléfono"
+            title="Procesa las 7 actas sintéticas con el MOTOR real (misma cola masiva) y publica el resultado real — sin depender del teléfono"
           >
-            {simulando ? "Procesando…" : "Probar motor (4 actas)"}
+            {simulando ? "Procesando…" : "Probar motor (7 actas)"}
           </Button>
           {/* D-33 — REINICIAR DEMO: 2 toques (kit §6); purga SOLO el rastro
               demo (actas runtime "demo" + filas "demo" del log) — jamás el

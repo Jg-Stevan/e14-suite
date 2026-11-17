@@ -299,7 +299,7 @@ describe("invariante nuevo de la tabla única: las 2 puertas aceptan/rechazan IG
 });
 
 describe("D98-sup (C-2) — default del kill-switch loteDemoLocal", () => {
-  test("FLAGS_DEFAULT.loteDemoLocal === true: el botón DEMO ×4 es PÚBLICO; false lo esconde", () => {
+  test("FLAGS_DEFAULT.loteDemoLocal === true: el botón DEMO ×7 es PÚBLICO; false lo esconde", () => {
     // El default TRUE es la esencia de D98-sup: el lote demo (fixtures
     // sintéticas — SEC-10: jamás actas reales) es público y el flag es el
     // único candado junto al aviso permanente role="status". Cambiar el

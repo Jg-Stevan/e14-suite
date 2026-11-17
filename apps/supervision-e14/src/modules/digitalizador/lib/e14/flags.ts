@@ -215,10 +215,11 @@ export const FLAGS_DEFAULT: FlagsApp = {
   // grandes donde prime el tiempo.
   procesoLadoMayor: 2560,
   // D98-sup (plan de cierre 2026-11-12, C-2) — sustituye al hallazgo #3 de la
-  // auditoría 2026-11-11: el lote DEMO (fixtures sintéticas acta-sim-*.jpg —
-  // SEC-10: jamás actas reales) es PÚBLICO y este flag es su KILL-SWITCH, el
-  // único candado junto al aviso permanente role="status" del orquestador;
-  // SIN gate de NODE_ENV. false esconde el botón DEMO ×4.
+  // auditoría 2026-11-11: el lote DEMO (las 7 imágenes sintéticas sim-*.jpg
+  // de la galería del digitalizador — SEC-10: jamás actas reales) es PÚBLICO
+  // y este flag es su KILL-SWITCH, el único candado junto al aviso permanente
+  // role="status" del orquestador;
+  // SIN gate de NODE_ENV. false esconde el botón DEMO ×7.
   // Override: {"loteDemoLocal":false} en localStorage/flags.json.
   loteDemoLocal: true,
   // Auditoría 2026-11-11 (#4) — ancla DEMO del panel de supervisión: el

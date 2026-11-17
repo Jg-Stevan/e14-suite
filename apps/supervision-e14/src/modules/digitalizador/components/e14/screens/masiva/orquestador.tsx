@@ -45,7 +45,7 @@ import { programarPrecargaAssetsOcr } from "@/modules/digitalizador/lib/e14/prec
 // P-23 — el consumidor de la recomendación `sincronizarSoloWifi` (dato del
 // perfil que hoy carecía de consumidor). MASIVA ya vive bajo PerfilProvider.
 import { usePerfilRecursos } from "@/modules/perfil-dispositivo/perfil-provider";
-// KIT visor-masiva-redesign-v1: lote DEMO (4 fixtures SINTÉTICAS) — entra
+// KIT visor-masiva-redesign-v1: lote DEMO (7 muestras SINTÉTICAS) — entra
 // por agregarFiles (misma puerta de siempre, pipeline completo sin atajos).
 import { fetchActasDemo } from "@/modules/digitalizador/lib/e14/actas-demo";
 // D98-sup (C-2): el botón DEMO es PÚBLICO bajo kill-switch — flag
@@ -232,8 +232,8 @@ export function MasivaView({ onVerEnMonitor }: PropsMasivaView) {
   }, []);
 
   // ── KIT visor-masiva-redesign-v1 — SEMBRADO DEL LOTE DEMO (preview) ──
-  // reiniciarEnvios (cola + ledger — mismo corte del mantenedor) → las 4 fixtures
-  // SINTÉTICAS entran como Files → pre-scan QR + runner de siempre.
+  // reiniciarEnvios (cola + ledger — mismo corte del mantenedor) → las 7
+  // imágenes SINTÉTICAS entran como Files → pre-scan QR + runner de siempre.
   const [demoSembrando, setDemoSembrando] = useState(false);
   const [loteDemoActivo, setLoteDemoActivo] = useState(false);
   useEffect(() => {
@@ -772,8 +772,8 @@ export function MasivaView({ onVerEnMonitor }: PropsMasivaView) {
                 type="button"
                 onClick={() => void sembrarDemo()}
                 disabled={demoSembrando || corriendo}
-                aria-label="Sembrar el lote demo de fixtures sintéticas y procesarlo"
-                title="Siembra el lote demo (fixtures sintéticas) y procesa la cola"
+                aria-label="Sembrar el lote demo de imágenes sintéticas y procesarlo"
+                title="Siembra el lote demo (7 imágenes sintéticas) y procesa la cola"
                 className="flex min-h-[40px] w-full items-center justify-center gap-1.5 rounded border border-amber-500/40 bg-amber-500/10 font-mono text-[10px] font-bold uppercase tracking-wider text-amber-300 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {demoSembrando ? (
@@ -781,7 +781,7 @@ export function MasivaView({ onVerEnMonitor }: PropsMasivaView) {
                 ) : (
                   <span className="h-2 w-2 rounded-full border border-amber-400" aria-hidden />
                 )}
-                {demoSembrando ? "SEMBRANDO…" : "DEMO ×4"}
+                {demoSembrando ? "SEMBRANDO…" : "DEMO ×7"}
               </button>
             ) : null}
 
