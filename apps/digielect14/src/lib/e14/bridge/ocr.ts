@@ -654,7 +654,21 @@ export async function ocrBanda(fotoProcesada: string): Promise<string> {
     // RapidOCR lo lee (campos 6/6 en Frankfurt incluyen lo que aporta la
     // banda). Escape hatch documentado (§5): revert puntual de C3.
     // 7.1: CALIDAD_JPEG_ENVIO (0.9) desde politica/umbrales.ts.
-    return await reconocerRapidOcr(canvas.toDataURL("image/jpeg", CALIDAD_JPEG_ENVIO));
+    const dataUrl = canvas.toDataURL("image/jpeg", CALIDAD_JPEG_ENVIO);
+    // KIT e14-banda-rapida-v1 — la franja es texto GRANDE y la orientación ya
+    // quedó fijada por el warp: mismo motor, menos maquinaria (cap rápido
+    // 1280, sin sondeo cls, sin rescate de bordes). flag OFF = pasada de
+    // siempre byte a byte.
+    if (leerFlags().ocrBandaRapida) {
+      const rt = await rapidOcrInit();
+      const r = await rapidOcrReconocer(rt, dataUrl, undefined, {
+        detCap: DET_CAP_RAPIDO,
+        omitirCls: true,
+        sinRescateBordes: true,
+      });
+      return r.texto;
+    }
+    return await reconocerRapidOcr(dataUrl);
   } catch {
     return ""; // fallo de decode/canvas/OCR → sin banda nueva (nunca condena)
   }

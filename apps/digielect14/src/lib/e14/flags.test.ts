@@ -134,6 +134,9 @@ describe("flags · leerFlags (cadena de prioridad)", () => {
       // KIT escaneo-compartido-v1 — detector de origen en IMPORTAR (escaneo
       // ya recortado → frame completo + marco impreso); default ON.
       escaneoIdentidad: true,
+      // KIT e14-banda-rapida-v1 — pasada de banda con cap 1280 + sin cls +
+      // sin rescate de bordes; default ON (kill-switch: false).
+      ocrBandaRapida: true,
     });
   });
 

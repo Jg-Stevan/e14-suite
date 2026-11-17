@@ -191,6 +191,11 @@ export interface FlagsApp {
   // IMPRESO del formulario como gate (mismo motor que la masiva, ahora en el
   // paquete). true = ON; false = camino de siempre byte a byte (fotos).
   escaneoIdentidad: boolean; // default true
+  // ─── KIT e14-banda-rapida-v1 — campo ADITIVO AL FINAL (D57): la pasada de
+  // banda (sello del tipo) usa cap det 1280, sin sondeo cls y sin rescate de
+  // bordes (la orientación ya la fijó el warp y el sello es texto grande).
+  // false = la pasada de siempre byte a byte.
+  ocrBandaRapida: boolean; // default true
 }
 
 export interface ReporteSesion {

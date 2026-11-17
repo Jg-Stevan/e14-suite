@@ -249,6 +249,10 @@ export function leerOverridesFlags(): Partial<FlagsApp> {
     // línea el kill-switch {"escaneoIdentidad": false} del mantenedor sería
     // inalcanzable desde localStorage (prioridad máxima, D6).
     if (typeof o.escaneoIdentidad === "boolean") limpio.escaneoIdentidad = o.escaneoIdentidad;
+    // KIT e14-banda-rapida-v1 — mismo criterio (DOBLE whitelist): sin esta
+    // línea el kill-switch {"ocrBandaRapida": false} sería inalcanzable desde
+    // localStorage (prioridad máxima, D6).
+    if (typeof o.ocrBandaRapida === "boolean") limpio.ocrBandaRapida = o.ocrBandaRapida;
     // NOTA (eliminación del módulo masiva): las puertas de los 17 flags
     // exclusivos de la cola se retiraron junto con el módulo.
     return limpio;

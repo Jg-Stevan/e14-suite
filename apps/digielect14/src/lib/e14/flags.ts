@@ -180,6 +180,13 @@ export const FLAGS_DEFAULT: FlagsApp = {
   // son escaneos (detector D63-A portado al paquete) — frame completo como
   // quad y marco impreso como gate. Kill-switch: false = camino de siempre.
   escaneoIdentidad: true,
+  // KIT e14-banda-rapida-v1 — la pasada de banda (sello del tipo) lee texto
+  // grande con la orientación YA fijada por el warp: cap det 1280 (no 1920),
+  // sin sondeo cls y sin rescate de bordes. Medido en la A13: 7.5-8.4 s →
+  // objetivo 3-4 s con el MISMO tipo leído (la validación exige desenlace,
+  // score y auto-envío idénticos en las 7 simuladas). false = pasada de
+  // siempre byte a byte.
+  ocrBandaRapida: true,
 };
 
 /** Último flags.json bueno (null = nunca llegó). */
@@ -304,6 +311,8 @@ export function sanearFlags(o: unknown): Partial<FlagsApp> {
   if (typeof p.bandaInferiorOcr === "boolean") limpio.bandaInferiorOcr = p.bandaInferiorOcr;
   // KIT escaneo-compartido-v1 — whitelist aditiva (booleano).
   if (typeof p.escaneoIdentidad === "boolean") limpio.escaneoIdentidad = p.escaneoIdentidad;
+  // KIT e14-banda-rapida-v1 — whitelist aditiva (booleano).
+  if (typeof p.ocrBandaRapida === "boolean") limpio.ocrBandaRapida = p.ocrBandaRapida;
   return limpio;
 }
 
