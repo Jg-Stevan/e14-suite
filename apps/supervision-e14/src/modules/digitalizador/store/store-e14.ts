@@ -45,6 +45,9 @@ import { registrarRecepcion } from "@/modules/supervision/data/recepcion-log";
 // Manifiesto de actas reales (D24 — memoizado en módulo): respaldo del
 // barcode IMPRESO en el papel cuando el pipeline no decodificó el 1D.
 import { cargarActasReales } from "@/modules/supervision/data/actas-reales/actas-reales";
+// P-22 — normalizador del payload del código impreso, capa shared (gemelo del
+// que ya usa la ruta del hub en hub-local.ts).
+import { normalizarQrPayload } from "@/shared/e14/huellas";
 import { leerRegistro } from "../lib/e14/masiva/cola";
 import type { Acta } from "../lib/e14/types";
 import { logger } from "../lib/logger";
@@ -213,6 +216,19 @@ async function publicarDesdeActa(
     // republica. «EN COLA» o ausente → sin huella (conservador).
     ...(acta.hashSha256 && /^[0-9a-f]{64}$/.test(acta.hashSha256)
       ? { hashSha256: acta.hashSha256 }
+      : {}),
+    // P-22 — cierre de la deuda P2 «dedup del puente móvil solo por SHA-256»
+    // para la ruta BANDEJA LOCAL: se pasa la capa 2 (payload EXACTO del código
+    // impreso leído por la capa 0, normalizado con normalizarQrPayload de
+    // shared — mismo gesto que la ruta del hub, hub-local.ts:311-314, y que el
+    // puente del móvil, puente/mapear.ts). El embudo (actas-runtime) compara
+    // igualdad EXACTA contra el índice de la página: misma página + mismo
+    // payload → DUPLICADA aunque los bytes de la foto difieran (acta
+    // re-fotografiada). Capa 3 (dhash64): el tipo Acta del panel NO la
+    // estampa (solo la calcula el puente del móvil), así que aquí no se pasa
+    // — sin huella no se inventa (conservador, igual que hashSha256).
+    ...(normalizarQrPayload(acta.qrPayload) !== null
+      ? { qrPayload: normalizarQrPayload(acta.qrPayload)! }
       : {}),
   });
   if (resultado.ok && resultado.duplicada) {

@@ -28,7 +28,7 @@ operación; **P2** mejora deseable.
 | P2 | R2 de calidad no ejecutada | Filtro de documento, deskew de fotos, recorte al marco, nitidez y PDF de entrega. Cada uno con flag. |
 | P2 | R1.5 presupuesto dinámico del prescan | Opcional; no se hizo. |
 | P2 | Sidecar sin firma | SmartScreen advierte; requiere VC++ 2015-2022; doble instancia en 8765 reparte tráfico. |
-| P2 | Dedup del puente móvil solo por SHA-256 exacto | El embudo (`actas-runtime.publicarActaMasiva`) detecta reenvíos con `hashSha256` (identidad de página + hash de bytes), la misma capa exacta de masiva. Las otras dos capas de masiva — dhash64 perceptual (Hamming ≤ 6) y payload QR exacto — NO viajan en `EntradaPuente`: una acta re-fotografiada (bytes distintos, misma imagen) entraría como página nueva. Reactivar: añadir `dhash64` y el payload QR al sobre del hub (`digielect14/src/lib/e14/puente/tipos.ts`) y al índice del embudo. |
+| P2 — **CERRADA (2026-11-19, parche P-22)** | Dedup del puente móvil solo por SHA-256 exacto | CERRADA: el sobre `EntradaPuente` declara las tres huellas — `qrPayload?` y `dhash64?` en `digielect14/src/lib/e14/puente/tipos.ts:70,75`, estampadas por el móvil en `puente/mapear.ts:135-154` y listadas en el contrato del hub (`docs/adr/2026-11-16-contrato-hub-e14-puente.md`, tabla del sobre, ~líneas 49-50). El panel las consume por la ruta del hub (`hub-local.ts:311-314` → `publicarActaMasiva`) y el embudo deduplica en 3 capas (`actas-runtime.ts:366-387`: SHA-256 de bytes + payload QR exacto + dhash64 con Hamming ≤ 6) — matiz: 3 capas en el embudo del panel (actas-runtime) + 4 vías en el store masiva (`bytes`/`dhash`/`payload`/`payload-remoto`, `ViaYaEnviada` en `masiva/store.ts:240`). La ruta BANDEJA LOCAL también pasa `qrPayload` desde `store-e14.ts` (`publicarDesdeActa`, normalizado con `normalizarQrPayload` de shared); el tipo `Acta` del panel no estampa `dhash64` (solo lo calcula el puente del móvil), así que por esa vía la capa 3 queda sin huella local — sin huella no se inventa (conservador). |
 
 ## 3. Operación y despliegue
 
@@ -83,6 +83,17 @@ operación; **P2** mejora deseable.
   (tapar firmas/cédulas) y re-empujar, (c) reemplazar los assets por fixtures
   sintéticos, (d) declararlos documentos públicos y asumir las firmas visibles.
   Ninguna se decidió aquí porque ninguna es reversible sin tocar el remoto.
+  **ESTADO R-49 (2026-11-19, verificación independiente):** el hallazgo es
+  HISTÓRICO del repo pre-consolidación — el árbol actual NO contiene los
+  assets señalados (verificado: `actas-reales/assets/`, `actas-demo/` y
+  `acta-e14-real.jpg` ya no existen) y el escaneo del 2026-11-12 dio 0 hallazgos
+  sobre commits accesibles (`docs/archivo/gitleaks-2026-11-12.txt`). Quedan
+  abiertos DOS tramos que requieren al mantenedor: (1) re-escanear la historia
+  COMPLETA desde el clon íntegro (el tramo de main anterior a ~2026-11-04; el
+  escaneo del 11-12 usó historia recortada) y (2) elegir y ejecutar una de las
+  opciones (a)–(d) para el remoto viejo, incluido ticket a GitHub Support para
+  cachés/vistas si se reescribe. El gate periódico ya corre con config propia
+  (`.gitleaks.toml`, R-60, 2026-11-19).
 - Los JSON de benchmark contienen texto OCR de actas reales: **nunca** se
   versionan (ya están ignorados).
 - `public/vendor/onnxruntime/` y `public/scanner/capa0-qr.worker.js` se generan
@@ -226,7 +237,15 @@ ningún par semántico baja de 5.3:1 (umbral AA texto: 4.5:1). Ratios medidos
 | `--neutral-state` #869583 (NO INICIADO) | 5.95 | 5.51 | — |
 | `--error-text` #ff8d87 | — | 7.82 | — |
 
-### 11.2 Hallazgo registrado — grises Tailwind CRUDOS como texto (crítico)
+### 11.2 Hallazgo registrado — grises Tailwind CRUDOS como texto (crítico) — CERRADA
+
+**CERRADA (2026-11-19):** migración aplicada — **35 instancias** de
+`text-slate-500`/`text-gray-500` → `text-muted-foreground` en los 8 archivos
+del módulo masiva + InformeCorrida (`InformeCorrida.tsx` ×21; masiva/:
+acelerador ×3, barra-lote ×3, dropzone ×1, fila ×3, helpers ×1,
+modal-revisor ×2, progreso-lote ×1). Re-verificado contra §11.1:
+`--muted-foreground` (#bbcbb8) mide ≥7.2:1 en todas las superficies del tema.
+El hallazgo original se conserva abajo como registro.
 
 Mismo patrón crítico que el móvil (A11Y-1 del DEUDA de digielect14):
 `text-slate-500` **×22**, `text-gray-500` **×13** y `text-gray-600` **×7**
