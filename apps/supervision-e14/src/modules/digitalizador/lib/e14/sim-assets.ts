@@ -4,8 +4,13 @@
  *
  * QUÉ ES: fixtures de la simulación, la misma entrada que produce una
  * captura: `File` de imagen → pipeline real (detect + warp + OCR + score).
- * Están recomprimidas (≤1400 px de ancho, JPEG q72) para que el repo no
- * cargue los 3-4 MB por foto del original.
+ * Re-renderizadas (2026-11-17) como fotos sintéticas nítidas de 2400×3200
+ * (JPEG q86, ~470 KB c/u): el acta ocupa 1150×2900 px del encuadre, de modo
+ * que el warp del motor entrega una foto procesada de alta resolución (el
+ * visor deja de verse blando al hacer zoom) y el texto tiene la misma
+ * proporción relativa que en el formulario impreso. La identidad impresa
+ * (consultado/país/zona/puesto/mesa, páginas y QR del payload) se conserva
+ * byte a byte respecto de las fixtures anteriores.
  *
  * D35 (opción A — anonimizar, 2026-11-08): la muestra «óptima» ERA una foto
  * real de acta (retirada del repo junto con las 8 WebP del kit actas-reales
@@ -30,9 +35,12 @@ import actaSimExtra2Url from "@/modules/digitalizador/assets/acta-sim-extra-2.jp
 
 /**
  * [0] óptima (nítida/plana — pipeline COMPLETO con detect+warp+bw) ·
- * [1] intermedia (leve perspectiva, as-is) · [2] baja (borrosa/arrugada,
+ * [1] intermedia (leve perspectiva, as-is) · [2] baja (sombra más marcada,
  * as-is) · [3]/[4] extras del ciclo rotativo. `sinRecorte` por ENTRADA
- * (§D8.1): el flag viaja con el asset, no con el chip.
+ * (§D8.1): el flag viaja con el asset, no con el chip. Nota (2026-11-17):
+ * la ranura «baja» conserva su rol de chip 4.3 (el score del modo SIM va
+ * inyectado), pero la fixture ya es legible: el lote DEMO corre el motor
+ * real y no debe arrastrar una advertencia artificial.
  */
 export interface ActaSim {
   src: typeof actaSimOptimaUrl;

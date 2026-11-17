@@ -207,7 +207,13 @@ export const FLAGS_DEFAULT: FlagsApp = {
   // guardado se revisó a ojo: recorte, sombras fuera y letra leíble (~165 ppp
   // sobre el lado largo de un A4 = la de un escáner de mesa).
   // Override: {"procesoLadoMayor":4032} = el default anterior, byte a byte.
-  procesoLadoMayor: 1920,
+  // 2026-11-17 — 1920 → 2560 por feedback del mantenedor: la foto PUBLICADA
+  // del acta (la que abre el visor del monitor) salía a ~663 px de ancho del
+  // papel — el zoom del visor la mostraba blanda. 2560 deja el papel a ~920 px
+  // (+92 % de área) con el mismo recorte; coste del warp ~1,8× (lote demo
+  // ~70 s vs 59 s de la curva). 1920 sigue disponible por override para lotes
+  // grandes donde prime el tiempo.
+  procesoLadoMayor: 2560,
   // D98-sup (plan de cierre 2026-11-12, C-2) — sustituye al hallazgo #3 de la
   // auditoría 2026-11-11: el lote DEMO (fixtures sintéticas acta-sim-*.jpg —
   // SEC-10: jamás actas reales) es PÚBLICO y este flag es su KILL-SWITCH, el
