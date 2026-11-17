@@ -41,7 +41,7 @@ import { create } from "zustand";
 import { publicarActaMasiva, type ResultadoPublicacion } from "@/modules/supervision/data/actas-runtime";
 // KIT recepcion-actas-v1 (D28): el desenlace SIN_JOIN nunca llega a
 // publicarActaMasiva — se registra aquí, donde se decide (log de recepción).
-import { registrarRecepcion } from "@/modules/supervision/data/recepcion-log";
+import { registrarRecepcion, type OrigenRecepcion } from "@/modules/supervision/data/recepcion-log";
 // Manifiesto de actas reales (D24 — memoizado en módulo): respaldo del
 // barcode IMPRESO en el papel cuando el pipeline no decodificó el 1D.
 import { cargarActasReales } from "@/modules/supervision/data/actas-reales/actas-reales";
@@ -153,10 +153,14 @@ export function codigoFormaDeActa(acta: Acta): string {
  * en supervision/data/actas-runtime.ts (única fuente); aquí solo se consume. */
 
 /** Publicación en el monitor de supervision (D23/D24/D25) — la completación
- * del trasplante: lo que masiva escanea y clasifica, supervision lo ubica. */
-async function publicarDesdeActa(
+ * del trasplante: lo que masiva escanea y clasifica, supervision lo ubica.
+ * `origen` viaja al log de recepción y al embudo: "demo" (D-32) mantiene el
+ * chip DEMO y el alcance de «Reiniciar demo» — el desenlace (foto procesada,
+ * score, status) es SIEMPRE el real del motor. */
+export async function publicarDesdeActa(
   acta: Acta,
   marcar: (p: PublicacionActa) => void,
+  origen: OrigenRecepcion = "carga-masiva",
 ): Promise<PublicacionActa["estado"]> {
   const join = joinDeActa(acta);
   if (!join) {
@@ -166,7 +170,7 @@ async function publicarDesdeActa(
     // vista Recepción la muestre; sin inventar idEnlace/mesa/formulario.
     registrarRecepcion({
       fecha: Date.now(),
-      origen: "carga-masiva",
+      origen,
       estado: "SIN_JOIN",
       idEnlace: "—",
       mesa: "—",
@@ -230,7 +234,7 @@ async function publicarDesdeActa(
     ...(normalizarQrPayload(acta.qrPayload) !== null
       ? { qrPayload: normalizarQrPayload(acta.qrPayload)! }
       : {}),
-  });
+  }, origen);
   if (resultado.ok && resultado.duplicada) {
     marcar({ estado: "duplicada", clave: resultado.clave });
     logger.info(`[e14] masiva → supervision: duplicada ${resultado.clave} (pág ${paginaIndex}) — no se reprocesa`);

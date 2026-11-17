@@ -16,12 +16,19 @@ import {
   type EstadoRecepcion,
 } from "../data/recepcion-log";
 import { tiempoRelativo } from "./tiempo";
-// D-32/D-33 (plan 2026-11-12) — SIMULAR RECEPCIÓN y REINICIAR DEMO: el lote
-// demo (fixtures sintéticas del módulo digitalizador — MISMA puerta que el
-// DEMO ×4 de MASIVA) entra por el embudo de siempre con origen "demo".
-import { publicarActaMasiva, reiniciarDemoPanel } from "../data/actas-runtime";
+// D-32/D-33 (plan 2026-11-12) — LOTE DE PRUEBA y REINICIAR DEMO: las 4
+// fixtures sintéticas entran por la COLA MASIVA y las procesa el MOTOR REAL
+// (mismo pipeline del lote ×4). El desenlace publicado —status, score y foto
+// PROCESADA— es el del motor, nunca telemetría anclada; el origen "demo"
+// solo sostiene el chip DEMO (D89-sup) y el alcance de «Reiniciar demo».
+import { reiniciarDemoPanel } from "../data/actas-runtime";
 import { purgarPorOrigen } from "../data/recepcion-log";
 import { fetchActasDemo } from "@/modules/digitalizador/lib/e14/actas-demo";
+import { publicarDesdeActa } from "@/modules/digitalizador/store/store-e14";
+import { useMasivaStore } from "@/modules/digitalizador/lib/e14/masiva/store";
+import { prescanYIniciar } from "@/modules/digitalizador/lib/e14/masiva/prescan-qr";
+import { leerRegistro } from "@/modules/digitalizador/lib/e14/masiva/cola";
+import type { EstadoEntrada } from "@/modules/digitalizador/lib/e14/masiva/tipos";
 import { KpiCard } from "@/shared/ui/kpi-card";
 import { Esqueleto } from "./esqueleto";
 // E2E local — la tarjeta que sondea el hub del celular (flujo cel → compu).
@@ -525,62 +532,53 @@ export function VistaRecepcion({
    * la lectura inicial consulta esto: nada de setState tras desmontar). */
   const montadoRef = useRef(false);
 
-  // ─── D-32 (plan 2026-11-12) — SIMULAR RECEPCIÓN ─────────────────────────
-  // Inyecta las 4 fixtures SINTÉTICAS por publicarActaMasiva con origen
-  // "demo" (el embudo de SIEMPRE: validación D25 + log + visor). El lote
-  // aterriza en las mesas del ancla demo (Roma 001/002) y el visor muestra
-  // el acta con chip DEMO — SIN depender del teléfono.
+  // ─── D-32 (plan 2026-11-12) — LOTE DE PRUEBA (motor real) ───────────────
+  // Encola las 4 fixtures SINTÉTICAS en la cola masiva y deja que el MOTOR
+  // las procese (decode → warp → completitud → gate → clasificación). Cada
+  // fila LISTA se publica con su resultado REAL (status/score/foto
+  // PROCESADA) por el embudo de siempre, con origen "demo" — el visor
+  // muestra el acta con chip DEMO y SIN depender del teléfono.
   const [simulando, setSimulando] = useState(false);
   const simularRecepcion = useCallback(async () => {
     if (simulando) return;
     setSimulando(true);
     try {
       const archivos = await fetchActasDemo();
-      // 4 fixtures → 4 páginas del ancla demo (Roma 88_495_010_02): el mismo
-      // reparto que resuelve el pipeline del lote DEMO ×4 de MASIVA.
-      const sobres = [
-        { mesa: "001", formulario: "TRANSMISION" as const, pagina: 1, total: 2, archivo: archivos[0] },
-        { mesa: "001", formulario: "TRANSMISION" as const, pagina: 2, total: 2, archivo: archivos[1] },
-        { mesa: "002", formulario: "TRANSMISION" as const, pagina: 1, total: 2, archivo: archivos[2] },
-        { mesa: "002", formulario: "DELEGADOS" as const, pagina: 1, total: 1, archivo: archivos[3] },
-      ];
-      for (let i = 0; i < sobres.length; i++) {
-        const { mesa, formulario, pagina, total, archivo } = sobres[i];
-        const srcFoto = await new Promise<string | null>((resolver) => {
-          const lector = new FileReader();
-          lector.onload = () => resolver(typeof lector.result === "string" ? lector.result : null);
-          lector.onerror = () => resolver(null);
-          lector.readAsDataURL(archivo);
-        });
-        await publicarActaMasiva(
-          {
-            idEnlace: "88_495_010_02",
-            mesa,
-            formulario,
-            paginaIndex: pagina,
-            paginaTotal: total,
-            srcFoto,
-            impresion: {
-              consulado: "88",
-              pais: "380 - ITALIA",
-              zona: "010",
-              puesto: "02",
-              mesa,
-              lugar: "Roma - Consulado",
-              etiquetaFormulario: formulario === "TRANSMISION" ? "TRANSMISIÓN" : "CÓNSUL/EMBAJADOR",
-            },
-            nombreArchivo: archivo.name,
-            // Telemetría informativa del lote demo (coherente con los scores
-            // anclados del modo SIM del móvil).
-            score: [9.2, 7.4, 8.6, 6.9][i] ?? 8,
-            statusActa: ["OPTIMA", "ADVERTENCIA", "OPTIMA", "ADVERTENCIA"][i] ?? "OPTIMA",
-          },
-          "demo"
-        );
+      const antes = new Set(useMasivaStore.getState().filas.map((f) => f.id));
+      await useMasivaStore.getState().agregarFiles(archivos);
+      const ids = useMasivaStore
+        .getState()
+        .filas.filter((f) => !antes.has(f.id))
+        .map((f) => f.id);
+      if (ids.length === 0) return;
+      await prescanYIniciar();
+      // Terminales del runner: LISTA se publica; ERROR/DUPLICADA/YA-ENVIADA
+      // no tienen acta propia que publicar (honestidad: nada se inventa).
+      const terminal = new Set<EstadoEntrada>([
+        "LISTA",
+        "ERROR",
+        "DUPLICADA",
+        "YA-ENVIADA",
+      ]);
+      const limite = Date.now() + 5 * 60_000;
+      const publicadas = new Set<string>();
+      while (Date.now() < limite) {
+        const propias = ids
+          .map((id) => useMasivaStore.getState().filas.find((f) => f.id === id))
+          .filter((f) => f !== undefined);
+        for (const fila of propias) {
+          if (fila.estado !== "LISTA" || publicadas.has(fila.id)) continue;
+          publicadas.add(fila.id);
+          const registro = await leerRegistro(fila.id).catch(() => null);
+          if (!registro?.acta) continue;
+          void publicarDesdeActa(registro.acta, () => {}, "demo");
+        }
+        if (propias.every((f) => terminal.has(f.estado))) break;
+        await new Promise((r) => setTimeout(r, 1500));
       }
     } catch (error) {
-      // la inyección jamás rompe la vista (misma doctrina del embudo)
-      console.info(`[e14] demo: inyección falló (${String(error)})`);
+      // la corrida de prueba jamás rompe la vista (misma doctrina del embudo)
+      console.info(`[e14] demo: corrida del motor falló (${String(error)})`);
     } finally {
       setSimulando(false);
     }
@@ -922,16 +920,16 @@ export function VistaRecepcion({
                 : "Pausado"
               : "Feed: transmitiendo"}
           </span>
-          {/* D-32 — SIMULAR RECEPCIÓN: lote demo por el embudo de siempre. */}
+          {/* D-32 — LOTE DE PRUEBA: las 4 fixtures las procesa el motor real. */}
           <Button
             variant="outline"
             size="sm"
             className="label-caps h-11 border-(--amber) text-(--amber) hover:bg-(--amber)/10"
             onClick={() => void simularRecepcion()}
             disabled={simulando}
-            title="Inyecta las 4 fixtures sintéticas (lote demo) por el embudo de siempre — sin depender del teléfono"
+            title="Procesa las 4 actas sintéticas con el MOTOR real (misma cola masiva) y publica el resultado real — sin depender del teléfono"
           >
-            {simulando ? "Inyectando…" : "Simular recepción"}
+            {simulando ? "Procesando…" : "Probar motor (4 actas)"}
           </Button>
           {/* D-33 — REINICIAR DEMO: 2 toques (kit §6); purga SOLO el rastro
               demo (actas runtime "demo" + filas "demo" del log) — jamás el
