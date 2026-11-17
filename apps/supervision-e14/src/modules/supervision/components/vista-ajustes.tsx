@@ -10,9 +10,10 @@
  *    el bundle ni en el repo (H-2). La LAN local (hub-local.mjs) no pide
  *    token — el header solo sale contra orígenes NO locales.
  *  · PRIVACIDAD Y RETENCIÓN — el aviso mínimo legal (0.6, fase 2 §9.2):
- *    qué contiene el panel, de dónde viene, cuánto se retiene (30 días o
- *    antes si hay confirmación oficial), quién responde y cómo pedir
- *    expurgo. Breve y visible, sin legalese.
+ *    qué contiene el panel, de dónde viene, la retención DECLARADA por el
+ *    operador del hub (30 días o antes si hay confirmación oficial — no
+ *    auditable desde el panel, ADR 2026-11-16-contrato-hub-e14-puente),
+ *    quién responde y cómo pedir expurgo. Breve y visible, sin legalese.
  *
  * Estilo del kit SUP-1: superficies oscuras, bordes 1px (sin sombras),
  * label-caps para títulos, radius 4px. La lectura de localStorage entra por
@@ -259,11 +260,13 @@ export function VistaAjustes() {
             lectura de arriba.
           </p>
           <p className="body-md text-foreground">
-            <span className="font-semibold">Cuánto se retiene.</span> La
-            política del hub es <span className="font-semibold">30 días</span>{" "}
-            desde la jornada, o ANTES si hay confirmación oficial de
-            recepción del material. Cumplido eso, las fotos se expurgan del
-            hub (puede quedar solo hash + metadatos).
+            <span className="font-semibold">Cuánto se retiene.</span> Política
+            DECLARADA por el operador del hub: retención de{" "}
+            <span className="font-semibold">30 días</span> desde la jornada, o
+            ANTES si hay confirmación oficial de recepción del material. La
+            aplicación efectiva de esa política NO es auditable desde este
+            panel (ADR 2026-11-16-contrato-hub-e14-puente, sección «Lo que NO
+            es auditable sin la fuente»); puede quedar solo hash + metadatos.
           </p>
           <p className="body-md text-foreground">
             <span className="font-semibold">Quién responde.</span> El
@@ -274,10 +277,12 @@ export function VistaAjustes() {
           </p>
           <p className="body-md text-foreground">
             <span className="font-semibold">Cómo pedir el expurgo.</span>{" "}
-            Solicítalo al operador del hub: se aplica un{" "}
+            Solicítalo al operador del hub: se declara un{" "}
             <span className="font-data">DELETE</span> autenticado contra el
             hub (por hash de acta o por jornada), con registro del evento.
-            Retiro inmediato, no espera a los 30 días.
+            El operador declara retiro inmediato (no espera a los 30 días);
+            la ejecución efectiva queda en manos del operador, no es
+            observable desde el panel.
           </p>
           <p className="body-md flex items-start gap-2 text-muted-foreground">
             <EyeOff className="mt-0.5 size-4 shrink-0" aria-hidden />

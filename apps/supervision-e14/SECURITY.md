@@ -81,9 +81,12 @@ Se aplicó la **opción A (anonimizar)** de la decisión D35 del mantenedor:
 - **Qué se trata**: actas E-14 (foto procesada del formulario + metadatos de
   mesa/formulario/encabezado impreso). El panel no lee votos ni maneja
   nombres/cédulas como datos estructurados.
-- **Retención**: las actas se **expurgan a 30 días** de la jornada, **o antes**
-  si hay confirmación oficial de recepción (política fijada con 0.4 en
-  `digielect14`); puede quedar solo hash + metadatos.
+- **Retención**: el operador del hub **declara** un expurgo a 30 días de la
+  jornada, **o antes** si hay confirmación oficial de recepción (política
+  fijada con 0.4 en `digielect14`); puede quedar solo hash + metadatos. La
+  ejecución efectiva del expurgo NO es auditable desde el monorepo — ver el
+  ADR `docs/adr/2026-11-16-contrato-hub-e14-puente.md` («Lo que NO es
+  auditable sin la fuente»).
 - **Responsable del tratamiento**: quien opera el hub y el panel.
 - **Expurgo bajo demanda**: `DELETE` autenticado contra el hub (por hash o por
   jornada), con log del evento.
