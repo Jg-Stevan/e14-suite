@@ -27,7 +27,7 @@
     "heic2any": "0.0.4",
     "onnxruntime-web": "1.31.1",
     "tesseract.js": "5.1.1",
-    "zxing-wasm": "3.1.6"
+    "zxing-wasm": "3.1.7"
   },
   "devDependencies": {
     "typescript": "^5.0.0",
